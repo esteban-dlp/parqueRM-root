@@ -331,3 +331,35 @@ GO
 
 PRINT '03_seed_security.sql ejecutado correctamente.';
 GO
+
+/* =========================
+   USUARIOS
+   ========================= */
+
+IF NOT EXISTS (SELECT 1 FROM dbo.users WHERE username = N'admin')
+BEGIN
+    INSERT INTO dbo.users
+    (
+        role_id,
+        username,
+        password_hash,
+        full_name,
+        email,
+        is_active,
+        last_login_at,
+        created_at,
+        updated_at
+    )
+    VALUES
+    (
+        1,
+        N'admin',
+        N'$2b$12$.JFcotaaZqS6E/XbFow1Xuq0CdQVbEYRItqhm/FDI6cNVuTdmuX3e',
+        N'Administrador del Sistema',
+        N'admin@parquerm.local',
+        1,
+        NULL,
+        SYSDATETIME(),
+        SYSDATETIME()
+    );
+END

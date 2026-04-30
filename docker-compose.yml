@@ -54,6 +54,7 @@ services:
       DB_NAME: ParqueRM
 
       JWT_SECRET: "${JWT_SECRET}"
+      JWT_REFRESH_SECRET: "${JWT_REFRESH_SECRET}"
     ports:
       - "${BACKEND_PORT}:3000"
     depends_on:
