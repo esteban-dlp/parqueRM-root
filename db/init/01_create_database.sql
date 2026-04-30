@@ -1,0 +1,5 @@
+IF DB_ID('ParqueRM') IS NULL
+BEGIN
+    CREATE DATABASE ParqueRM;
+END
+GO

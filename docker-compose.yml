@@ -1,0 +1,86 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: parqueRM-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${SQLSERVER_SA_PASSWORD}"
+      MSSQL_PID: "Express"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - parqueRM-net
+    restart: unless-stopped
+
+  db-init:
+    image: mcr.microsoft.com/mssql-tools
+    container_name: parqueRM-db-init
+    depends_on:
+      - sqlserver
+    volumes:
+      - ./db/init:/scripts
+    environment:
+      SQLSERVER_SA_PASSWORD: "${SQLSERVER_SA_PASSWORD}"
+    command: >
+      /bin/bash -c "
+      echo 'Esperando SQL Server...' &&
+      sleep 30 &&
+      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$SQLSERVER_SA_PASSWORD\" -i /scripts/01_create_database.sql &&
+      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$SQLSERVER_SA_PASSWORD\" -d ParqueRM -i /scripts/02_schema.sql &&
+      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$SQLSERVER_SA_PASSWORD\" -d ParqueRM -i /scripts/03_seed_security.sql &&
+      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$SQLSERVER_SA_PASSWORD\" -d ParqueRM -i /scripts/04_seed_catalogs.sql &&
+      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$SQLSERVER_SA_PASSWORD\" -d ParqueRM -i /scripts/05_seed_tariffs.sql &&
+      echo 'Base de datos inicializada.'
+      "
+    networks:
+      - parqueRM-net
+    restart: "no"
+
+  backend:
+    build:
+      context: ../parqueRM-backend
+      dockerfile: Dockerfile
+    container_name: parqueRM-backend
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+
+      DB_HOST: sqlserver
+      DB_PORT: 1433
+      DB_USER: sa
+      DB_PASSWORD: "${SQLSERVER_SA_PASSWORD}"
+      DB_NAME: ParqueRM
+
+      JWT_SECRET: "${JWT_SECRET}"
+    ports:
+      - "${BACKEND_PORT}:3000"
+    depends_on:
+      - sqlserver
+      - db-init
+    networks:
+      - parqueRM-net
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../parqueRM-frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: "${VITE_API_URL}"
+    container_name: parqueRM-frontend
+    ports:
+      - "${FRONTEND_PORT}:80"
+    depends_on:
+      - backend
+    networks:
+      - parqueRM-net
+    restart: unless-stopped
+
+volumes:
+  sqlserver_data:
+
+networks:
+  parqueRM-net:
+    driver: bridge

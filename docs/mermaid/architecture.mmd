@@ -1,0 +1,6 @@
+flowchart LR
+    Client[Computadoras del parque] --> Frontend[Frontend React / Nginx]
+    Frontend --> Backend[Backend NestJS API]
+    Backend --> DB[(SQL Server)]
+    Backend --> Auth[JWT + RBAC]
+    DB --> Scripts[Scripts SQL Init]
