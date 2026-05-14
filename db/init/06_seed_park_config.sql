@@ -34,7 +34,7 @@ BEGIN
         'Dirección pendiente de configurar',
         '+502 0000-0000',
         'info@parque.local',
-        NULL,
+        '/logo-quetzal.jpg',
         'http://192.168.1.10',
         150
     );
