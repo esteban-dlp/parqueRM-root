@@ -1,0 +1,9 @@
+:{{FRONTEND_PORT}} {
+    root * {{FRONTEND_DIST_PATH}}
+    file_server
+    try_files {path} /index.html
+    log {
+        output file {{LOG_DIR}}/access.log
+        format console
+    }
+}

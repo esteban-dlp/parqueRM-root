@@ -1,0 +1,17 @@
+# Generated installer output
+release/
+
+# Offline runtime binaries
+installer/runtime-cache/**/*
+!installer/runtime-cache/**/
+!installer/runtime-cache/**/.gitkeep
+!installer/runtime-cache/**/README.txt
+
+# Runtime/binary files
+*.exe
+*.msi
+*.zip
+
+# Logs/temp
+*.log
+*.tmp
