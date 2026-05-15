@@ -461,6 +461,11 @@ BEGIN
         origin_id INT NULL,
 
         payment_method_id INT NOT NULL,
+        subtotal DECIMAL(12,2) NULL,
+        discount_type NVARCHAR(20) NULL,
+        discount_percentage DECIMAL(5,2) NULL,
+        discount_amount DECIMAL(12,2) NULL DEFAULT 0,
+        discount_reason NVARCHAR(500) NULL,
         total DECIMAL(12,2) NOT NULL,
         amount_received DECIMAL(12,2) NULL,
         change_amount DECIMAL(12,2) NULL,
@@ -620,6 +625,29 @@ BEGIN
     CREATE INDEX ix_audit_logs_entity ON audit_logs(entity_name, entity_id);
     CREATE INDEX ix_audit_logs_created_at ON audit_logs(created_at);
 END
+GO
+
+/* ============================================================
+   MIGRACIONES INCREMENTALES
+   Columnas agregadas después de la creación inicial.
+   Idempotentes: usan IF NOT EXISTS sobre sys.columns.
+   ============================================================ */
+
+-- receipts: columnas de descuento (agregadas en v2)
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('receipts') AND name = 'subtotal')
+    ALTER TABLE receipts ADD subtotal DECIMAL(12,2) NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('receipts') AND name = 'discount_percentage')
+    ALTER TABLE receipts ADD discount_percentage DECIMAL(5,2) NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('receipts') AND name = 'discount_amount')
+    ALTER TABLE receipts ADD discount_amount DECIMAL(12,2) NULL DEFAULT 0;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('receipts') AND name = 'discount_reason')
+    ALTER TABLE receipts ADD discount_reason NVARCHAR(500) NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('receipts') AND name = 'discount_type')
+    ALTER TABLE receipts ADD discount_type NVARCHAR(20) NULL;
 GO
 
 PRINT '02_schema.sql ejecutado correctamente.';

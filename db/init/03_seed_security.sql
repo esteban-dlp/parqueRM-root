@@ -243,6 +243,13 @@ BEGIN
 END
 GO
 
+IF NOT EXISTS (SELECT 1 FROM permissions WHERE code = 'TARIFF_OVERRIDE')
+BEGIN
+    INSERT INTO permissions (code, name, module, description)
+    VALUES ('TARIFF_OVERRIDE', 'Sobreescribir tarifa', 'Tarifas', 'Permite modificar manualmente el monto de tarifa aplicada en registros operativos');
+END
+GO
+
 
 /* =========================
    ASIGNACIÓN: ADMINISTRADOR
