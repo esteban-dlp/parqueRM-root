@@ -93,8 +93,17 @@ BEGIN
         logo_url NVARCHAR(500) NULL,
         system_lan_url NVARCHAR(255) NULL,
         max_capacity INT NOT NULL DEFAULT 150,
+        sidebar_color_hex NVARCHAR(7) NULL,
         created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-        updated_at DATETIME2 NULL
+        updated_at DATETIME2 NULL,
+
+        CONSTRAINT CK_park_config_sidebar_color_hex CHECK (
+            sidebar_color_hex IS NULL OR (
+                LEN(sidebar_color_hex) = 7
+                AND LEFT(sidebar_color_hex, 1) = '#'
+                AND SUBSTRING(sidebar_color_hex, 2, 6) NOT LIKE '%[^0-9A-Fa-f]%'
+            )
+        )
     );
 END
 GO

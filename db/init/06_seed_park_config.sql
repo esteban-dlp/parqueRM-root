@@ -23,7 +23,8 @@ BEGIN
         email,
         logo_url,
         system_lan_url,
-        max_capacity
+        max_capacity,
+        sidebar_color_hex
     )
     VALUES (
         'El Refugio del Quetzal',
@@ -34,9 +35,10 @@ BEGIN
         'Dirección pendiente de configurar',
         '+502 0000-0000',
         'info@parque.local',
-        '/logo-quetzal.jpg',
+        NULL,
         'http://192.168.1.10',
-        150
+        150,
+        '#1A3A2A'
     );
 END
 GO

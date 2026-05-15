@@ -45,6 +45,7 @@ services:
       /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"${SQLSERVER_SA_PASSWORD}\" -d ParqueRM -i /scripts/05_seed_tariffs.sql &&
       /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"${SQLSERVER_SA_PASSWORD}\" -d ParqueRM -i /scripts/06_seed_park_config.sql &&
       /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"${SQLSERVER_SA_PASSWORD}\" -d ParqueRM -i /scripts/07_seed_demo_data.sql &&
+      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"${SQLSERVER_SA_PASSWORD}\" -d ParqueRM -i /scripts/08_patch_park_config_sidebar_color_hex.sql &&
       echo 'Base de datos inicializada correctamente.'
       "
     networks:
