@@ -99,7 +99,6 @@ Source: "{#ReleaseDir}\version.json"; DestDir: "{app}"; \
 [Dirs]
 Name: "{app}\logs\backend";  Components: server
 Name: "{app}\logs\frontend"; Components: server
-Name: "{app}\logs\updates";  Components: server
 Name: "{app}\logs\db-init";  Components: server
 Name: "{app}\backups";       Components: server
 Name: "{app}\config";        Components: server
@@ -114,7 +113,6 @@ Name: "{group}\Detener servicios";       Filename: "{app}\tools\stop-services.ba
 Name: "{group}\Crear backup";            Filename: "{app}\tools\backup-db.bat";           Components: server
 Name: "{group}\Restaurar backup";        Filename: "{app}\tools\restore-db.bat";          Components: server
 Name: "{group}\Cambiar IP del servidor"; Filename: "{app}\tools\change-server-ip.bat";    Components: server
-Name: "{group}\Aplicar actualizacion";  Filename: "{app}\tools\apply-update.bat";        Components: server
 
 ; --- Desktop shortcut (server) --------------------------------------------------
 Name: "{userdesktop}\ParqueRM";          Filename: "{app}\tools\open-parquerm.bat"; \
@@ -139,6 +137,7 @@ Filename: "powershell.exe"; \
     -InstallDir ""{app}"" \
     -RuntimeCacheDir ""{app}\runtime"" \
     -DbPassword ""{code:GetDbPassword}"" \
+    -AdminPassword ""{code:GetAdminPassword}"" \
     -InitScriptsDir ""{app}\app\database\init"" \
     -MigrationsDir ""{app}\app\database\migrations"" \
     -SkipSqlServerInstall:{code:SkipSqlInstall}"; \
@@ -153,7 +152,8 @@ Filename: "powershell.exe"; \
     -ServerIp ""{code:GetServerIp}"" \
     -DbPassword ""{code:GetDbPassword}"" \
     -JwtSecret ""{code:GetJwtSecret}"" \
-    -JwtRefreshSecret ""{code:GetJwtRefreshSecret}"""; \
+    -JwtRefreshSecret ""{code:GetJwtRefreshSecret}"" \
+    -PreserveExistingSecrets"; \
   Flags: runhidden waituntilterminated; \
   StatusMsg: "Generando configuracion..."; \
   Components: server
@@ -200,19 +200,49 @@ Type: filesandordirs; Name: "{app}\services"
 var
   ServerIpPage:       TInputQueryWizardPage;
   DbPasswordPage:     TInputQueryWizardPage;
+  AdminPasswordPage:  TInputQueryWizardPage;
   JwtPage:            TInputQueryWizardPage;
   ClientServerIpPage: TInputQueryWizardPage;
   GServerIp:          String;
   GDbPassword:        String;
+  GAdminPassword:     String;
   GJwtSecret:         String;
   GJwtRefreshSecret:  String;
+  GExistingInstall:   Boolean;
+
+function DetectLanIp: String;
+var
+  tmpFile: String;
+  rc: Integer;
+  ps: String;
+begin
+  Result := '';
+  tmpFile := ExpandConstant('{tmp}\parquerm-detected-ip.txt');
+  ps :=
+    "$patterns='vEthernet','VMware','VirtualBox','Hyper-V','WSL','Loopback','Pseudo','Bluetooth','Teredo','ISATAP','Microsoft Wi-Fi Direct','WAN Miniport','Tunnel';" +
+    "$ips=Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -notmatch '^127\.' -and $_.IPAddress -notmatch '^169\.254\.' -and $_.PrefixOrigin -ne 'WellKnown' -and $_.SuffixOrigin -ne 'Random' } | ForEach-Object { $a=Get-NetAdapter -InterfaceIndex $_.InterfaceIndex -ErrorAction SilentlyContinue; if ($a -and $a.Status -eq 'Up') { $name=$a.Name + ' ' + $a.InterfaceDescription; $virtual=$false; foreach($p in $patterns){ if($name -like ('*'+$p+'*')){ $virtual=$true } }; if(-not $virtual){ [pscustomobject]@{ IP=$_.IPAddress; Name=$name } } } };" +
+    "$wired=$ips | Where-Object { $_.Name -notmatch 'Wi-Fi|Wireless|802\.11|WLAN' } | Select-Object -First 1;" +
+    "$pick=if($wired){$wired}else{$ips|Select-Object -First 1};" +
+    "if($pick){ Set-Content -Path '" + tmpFile + "' -Value $pick.IP -Encoding ASCII }";
+
+  Exec('powershell.exe',
+    '-NoProfile -ExecutionPolicy Bypass -Command "' + ps + '"',
+    '', SW_HIDE, ewWaitUntilTerminated, rc);
+
+  if FileExists(tmpFile) then begin
+    LoadStringFromFile(tmpFile, Result);
+    Result := Trim(Result);
+  end;
+end;
 
 function GenerateSecret(len: Integer): String;
 var
   chars: String;
   i, idx: Integer;
 begin
-  chars := 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+  { Use only dotenv-safe characters. Symbols like # can be parsed as comments
+    by dotenv unless quoted perfectly through every installer layer. }
+  chars := 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   Result := '';
   for i := 1 to len do begin
     idx := (Random(Length(chars)) + 1);
@@ -222,21 +252,24 @@ end;
 
 procedure InitializeWizard;
 begin
+  GExistingInstall := FileExists(ExpandConstant('{#DefaultDir}\app\backend\.env'));
+  GServerIp := DetectLanIp;
+
   { Server IP page -- shown only in server mode }
   ServerIpPage := CreateInputQueryPage(wpSelectComponents,
     'Direccion IP del servidor',
     'Ingrese la IP de esta computadora en la red local.',
-    'Las demas computadoras usaran esta IP para conectarse. Ejemplo: 192.168.1.10');
+    'Las demas computadoras usaran esta IP para conectarse. Puede verla con ipconfig.');
   ServerIpPage.Add('IP del servidor:', False);
-  ServerIpPage.Values[0] := '192.168.1.10';
+  ServerIpPage.Values[0] := GServerIp;
 
   { Client-only server IP page -- shown only in client-only mode }
   ClientServerIpPage := CreateInputQueryPage(wpSelectComponents,
     'IP del servidor ParqueRM',
     'Ingrese la IP del servidor donde ParqueRM esta instalado.',
-    'Ejemplo: 192.168.1.10');
+    'Ejemplo: 192.168.68.51');
   ClientServerIpPage.Add('IP del servidor ParqueRM:', False);
-  ClientServerIpPage.Values[0] := '192.168.1.10';
+  ClientServerIpPage.Values[0] := '';
 
   { DB password page }
   DbPasswordPage := CreateInputQueryPage(ServerIpPage.ID,
@@ -246,8 +279,16 @@ begin
   DbPasswordPage.Add('Contrasena:', True);
   DbPasswordPage.Add('Confirmar contrasena:', True);
 
+  { Admin password page }
+  AdminPasswordPage := CreateInputQueryPage(DbPasswordPage.ID,
+    'Contrasena del usuario admin',
+    'Ingrese la contrasena para iniciar sesion en ParqueRM.',
+    'El usuario sera "admin". Esta contrasena no es la contrasena tecnica de SQL Server.');
+  AdminPasswordPage.Add('Contrasena admin:', True);
+  AdminPasswordPage.Add('Confirmar contrasena admin:', True);
+
   { JWT secrets page -- pre-filled with random secrets }
-  JwtPage := CreateInputQueryPage(DbPasswordPage.ID,
+  JwtPage := CreateInputQueryPage(AdminPasswordPage.ID,
     'Secretos JWT',
     'Secretos para firmar tokens de acceso y refresco.',
     'Se generaron secretos aleatorios. Puede dejarlos como estan o ingresar los suyos.');
@@ -262,11 +303,49 @@ var
   isServer: Boolean;
 begin
   isServer := WizardIsComponentSelected('server');
-  if (PageID = ServerIpPage.ID) and (not isServer) then Result := True
+  if (PageID = ServerIpPage.ID) and ((not isServer) or (GServerIp <> '')) then Result := True
   else if (PageID = DbPasswordPage.ID) and (not isServer) then Result := True
-  else if (PageID = JwtPage.ID) and (not isServer) then Result := True
+  else if (PageID = AdminPasswordPage.ID) and (not isServer) then Result := True
+  else if (PageID = JwtPage.ID) and ((not isServer) or GExistingInstall) then Result := True
   else if (PageID = ClientServerIpPage.ID) and isServer then Result := True
   else Result := False;
+end;
+
+function IsValidIPv4(Value: String): Boolean;
+var
+  i, dots: Integer;
+  ch: String;
+begin
+  Result := True;
+  dots := 0;
+  if Trim(Value) = '' then begin
+    Result := False; Exit;
+  end;
+  for i := 1 to Length(Value) do begin
+    ch := Copy(Value, i, 1);
+    if ch = '.' then dots := dots + 1
+    else if Pos(ch, '0123456789') = 0 then begin
+      Result := False; Exit;
+    end;
+  end;
+  Result := dots = 3;
+end;
+
+function PasswordLooksSqlStrong(Value: String): Boolean;
+var
+  i: Integer;
+  ch: String;
+  hasUpper, hasLower, hasDigit, hasSymbol: Boolean;
+begin
+  hasUpper := False; hasLower := False; hasDigit := False; hasSymbol := False;
+  for i := 1 to Length(Value) do begin
+    ch := Copy(Value, i, 1);
+    if Pos(ch, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') > 0 then hasUpper := True
+    else if Pos(ch, 'abcdefghijklmnopqrstuvwxyz') > 0 then hasLower := True
+    else if Pos(ch, '0123456789') > 0 then hasDigit := True
+    else hasSymbol := True;
+  end;
+  Result := (Length(Value) >= 8) and hasUpper and hasLower and hasDigit and hasSymbol;
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -274,16 +353,16 @@ begin
   Result := True;
 
   if CurPageID = ServerIpPage.ID then begin
-    if Trim(ServerIpPage.Values[0]) = '' then begin
-      MsgBox('La IP del servidor no puede estar vacia.', mbError, MB_OK);
+    if not IsValidIPv4(Trim(ServerIpPage.Values[0])) then begin
+      MsgBox('Ingrese una IPv4 valida del servidor. Ejemplo: 192.168.68.51', mbError, MB_OK);
       Result := False; Exit;
     end;
     GServerIp := Trim(ServerIpPage.Values[0]);
   end;
 
   if CurPageID = ClientServerIpPage.ID then begin
-    if Trim(ClientServerIpPage.Values[0]) = '' then begin
-      MsgBox('La IP del servidor no puede estar vacia.', mbError, MB_OK);
+    if not IsValidIPv4(Trim(ClientServerIpPage.Values[0])) then begin
+      MsgBox('Ingrese una IPv4 valida del servidor. Ejemplo: 192.168.68.51', mbError, MB_OK);
       Result := False; Exit;
     end;
     GServerIp := Trim(ClientServerIpPage.Values[0]);
@@ -294,8 +373,12 @@ begin
       MsgBox('La contrasena no puede estar vacia.', mbError, MB_OK);
       Result := False; Exit;
     end;
-    if Length(DbPasswordPage.Values[0]) < 8 then begin
-      MsgBox('La contrasena debe tener al menos 8 caracteres.', mbError, MB_OK);
+    if Pos('"', DbPasswordPage.Values[0]) > 0 then begin
+      MsgBox('La contrasena SQL no puede contener comillas dobles.', mbError, MB_OK);
+      Result := False; Exit;
+    end;
+    if not PasswordLooksSqlStrong(DbPasswordPage.Values[0]) then begin
+      MsgBox('La contrasena debe tener al menos 8 caracteres e incluir mayuscula, minuscula, numero y simbolo. Ejemplo: ParqueRM2026!', mbError, MB_OK);
       Result := False; Exit;
     end;
     if DbPasswordPage.Values[0] <> DbPasswordPage.Values[1] then begin
@@ -305,9 +388,33 @@ begin
     GDbPassword := DbPasswordPage.Values[0];
   end;
 
+  if CurPageID = AdminPasswordPage.ID then begin
+    if AdminPasswordPage.Values[0] = '' then begin
+      MsgBox('La contrasena admin no puede estar vacia.', mbError, MB_OK);
+      Result := False; Exit;
+    end;
+    if Pos('"', AdminPasswordPage.Values[0]) > 0 then begin
+      MsgBox('La contrasena admin no puede contener comillas dobles.', mbError, MB_OK);
+      Result := False; Exit;
+    end;
+    if Length(AdminPasswordPage.Values[0]) < 8 then begin
+      MsgBox('La contrasena admin debe tener al menos 8 caracteres.', mbError, MB_OK);
+      Result := False; Exit;
+    end;
+    if AdminPasswordPage.Values[0] <> AdminPasswordPage.Values[1] then begin
+      MsgBox('Las contrasenas admin no coinciden.', mbError, MB_OK);
+      Result := False; Exit;
+    end;
+    GAdminPassword := AdminPasswordPage.Values[0];
+  end;
+
   if CurPageID = JwtPage.ID then begin
-    if JwtPage.Values[0] = '' then begin
-      MsgBox('El JWT Secret no puede estar vacio.', mbError, MB_OK);
+    if Length(JwtPage.Values[0]) < 16 then begin
+      MsgBox('El JWT Secret debe tener al menos 16 caracteres.', mbError, MB_OK);
+      Result := False; Exit;
+    end;
+    if Length(JwtPage.Values[1]) < 16 then begin
+      MsgBox('El JWT Refresh Secret debe tener al menos 16 caracteres.', mbError, MB_OK);
       Result := False; Exit;
     end;
     GJwtSecret := JwtPage.Values[0];
@@ -327,6 +434,11 @@ begin
   Result := GDbPassword;
 end;
 
+function GetAdminPassword(Param: String): String;
+begin
+  Result := GAdminPassword;
+end;
+
 function GetJwtSecret(Param: String): String;
 begin
   Result := GJwtSecret;
@@ -342,6 +454,18 @@ begin
   { Always attempt SQL Server install unless already present.
     initialize-db.ps1 checks if SQL Server is already installed. }
   Result := 'false';
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  rc: Integer;
+begin
+  Result := '';
+  if WizardIsComponentSelected('server') then begin
+    Exec('powershell.exe',
+      '-NoProfile -ExecutionPolicy Bypass -Command "Stop-Service ParqueRMFrontend,ParqueRMBackend -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 3"',
+      '', SW_HIDE, ewWaitUntilTerminated, rc);
+  end;
 end;
 
 { ===== Client-only: write URL shortcut file ===== }

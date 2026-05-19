@@ -145,6 +145,10 @@ $envXml</service>
     $existing = Get-Service -Name $ServiceId -ErrorAction SilentlyContinue
     if ($existing) {
         Write-Host "  [UPDATE] $DisplayName -- re-installing" -ForegroundColor Yellow
+        if ($existing.Status -ne 'Stopped') {
+            Stop-Service -Name $ServiceId -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
+        }
         & $exePath uninstall 2>&1 | Out-Null
         Start-Sleep -Seconds 2
     }
@@ -192,9 +196,86 @@ Install-WinSwService `
 
 # --- Start services -----------------------------------------------------------
 Write-Host "`nStarting services..." -ForegroundColor Cyan
-Start-Service 'ParqueRMBackend'  -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 3
-Start-Service 'ParqueRMFrontend' -ErrorAction SilentlyContinue
+
+function Start-ParqueService {
+    param([string]$ServiceId)
+
+    $svcExe = Join-Path $ServicesDir "$ServiceId\$ServiceId.exe"
+    $lastError = $null
+
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        $svc = Get-Service -Name $ServiceId -ErrorAction Stop
+        if ($svc.Status -eq 'Running') {
+            Write-Host "  [OK] $ServiceId is running" -ForegroundColor Green
+            return
+        }
+
+        Write-Host "  Starting $ServiceId (attempt $attempt/3)..." -ForegroundColor Yellow
+        try {
+            Start-Service -Name $ServiceId -ErrorAction Stop
+        } catch {
+            $lastError = $_.Exception.Message
+            if (Test-Path $svcExe) {
+                & $svcExe start 2>&1 | Out-Null
+            }
+        }
+
+        Start-Sleep -Seconds 8
+        $svc.Refresh()
+        if ($svc.Status -eq 'Running') {
+            Write-Host "  [OK] $ServiceId is running" -ForegroundColor Green
+            return
+        }
+    }
+
+    if ($lastError) {
+        Write-Error "Service $ServiceId did not start. Last error: $lastError"
+    } else {
+        Write-Error "Service $ServiceId did not start."
+    }
+    exit 1
+}
+
+function Wait-HttpOk {
+    param(
+        [string]$Name,
+        [string]$Url,
+        [int]$TimeoutSeconds = 90
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $lastError = ''
+
+    while ((Get-Date) -lt $deadline) {
+        try {
+            $response = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 5
+            if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 400) {
+                Write-Host "  [OK] $Name responded: $Url" -ForegroundColor Green
+                return
+            }
+        } catch {
+            $lastError = $_.Exception.Message
+        }
+        Start-Sleep -Seconds 3
+    }
+
+    Write-Error "$Name did not respond at $Url. Last error: $lastError"
+    exit 1
+}
+
+Start-ParqueService 'ParqueRMBackend'
+Wait-HttpOk 'Backend health' 'http://127.0.0.1:3000/api/health' 90
+
+Start-ParqueService 'ParqueRMFrontend'
+Wait-HttpOk 'Frontend' 'http://127.0.0.1/' 45
+
+foreach ($svcName in @('ParqueRMBackend', 'ParqueRMFrontend')) {
+    $svc = Get-Service -Name $svcName -ErrorAction Stop
+    if ($svc.Status -ne 'Running') {
+        Write-Error "Service $svcName did not stay Running. Current status: $($svc.Status)"
+        exit 1
+    }
+}
 
 Write-Host ""
 Write-Host "Services installed and started." -ForegroundColor Green

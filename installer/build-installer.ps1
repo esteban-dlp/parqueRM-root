@@ -175,8 +175,7 @@ if (Test-Path $ReleaseDir) {
 $releasePaths = @(
     'app\backend', 'app\frontend\dist', 'app\database\init', 'app\database\migrations',
     'app\config', 'app\logs', 'app\tools',
-    'runtime\sqlserver-express', 'runtime\node', 'runtime\caddy', 'runtime\winsw', 'runtime\sqlcmd',
-    'updates'
+    'runtime\sqlserver-express', 'runtime\node', 'runtime\caddy', 'runtime\winsw', 'runtime\sqlcmd'
 )
 foreach ($p in $releasePaths) {
     New-Item -ItemType Directory -Path (Join-Path $ReleaseDir $p) -Force | Out-Null

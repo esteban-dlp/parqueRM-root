@@ -35,10 +35,10 @@
 param(
     [string]$InstallDir           = 'C:\ParqueRM',
     [string]$RuntimeCacheDir      = '',
-    [Parameter(Mandatory)]
-    [string]$DbPassword,
+    [string]$DbPassword           = '',
+    [string]$AdminPassword        = '',
     [string]$DbName               = 'ParqueRM',
-    [switch]$SkipSqlServerInstall,
+    [string]$SkipSqlServerInstall = 'false',
     [string]$InitScriptsDir       = '',
     [string]$MigrationsDir        = ''
 )
@@ -76,6 +76,64 @@ $LogDir = Join-Path $InstallDir 'logs\db-init'
 if (-not (Test-Path $LogDir)) { New-Item -ItemType Directory -Path $LogDir -Force | Out-Null }
 $LogFile = Join-Path $LogDir "db-init-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
 
+$skipSqlInstallFlag = $false
+if ($SkipSqlServerInstall -match '^(1|true|yes)$') { $skipSqlInstallFlag = $true }
+
+function Read-DotEnvValue([string]$Path, [string]$Key) {
+    if (-not (Test-Path $Path)) { return '' }
+    $line = Get-Content $Path | Where-Object { $_ -match "^$([regex]::Escape($Key))=" } | Select-Object -First 1
+    if (-not $line) { return '' }
+    $value = ($line -split '=', 2)[1]
+    if ($value.Length -ge 2) {
+        $first = $value.Substring(0, 1)
+        $last = $value.Substring($value.Length - 1, 1)
+        if (($first -eq '"' -and $last -eq '"') -or ($first -eq "'" -and $last -eq "'")) {
+            $value = $value.Substring(1, $value.Length - 2)
+        }
+    }
+    return $value
+}
+
+if ([string]::IsNullOrWhiteSpace($DbPassword)) {
+    $envPath = Join-Path $InstallDir 'app\backend\.env'
+    $DbPassword = Read-DotEnvValue $envPath 'DB_PASSWORD'
+}
+
+function New-BcryptHash([string]$PlainTextPassword) {
+    $defaultAdminHash = '$2b$12$.JFcotaaZqS6E/XbFow1Xuq0CdQVbEYRItqhm/FDI6cNVuTdmuX3e'
+    if ([string]::IsNullOrWhiteSpace($PlainTextPassword)) { return $defaultAdminHash }
+
+    $nodePath = Join-Path $RuntimeCacheDir 'node\node.exe'
+    if (-not (Test-Path $nodePath)) {
+        $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+        if ($nodeCmd) { $nodePath = $nodeCmd.Source }
+    }
+    if (-not (Test-Path $nodePath)) {
+        Write-Log "ERROR: node.exe not found; cannot hash admin password." 'Red'
+        exit 1
+    }
+
+    $backendDir = Join-Path $InstallDir 'app\backend'
+    $script = "const path=require('path'); const bcrypt=require(path.join(process.cwd(),'node_modules','bcrypt')); bcrypt.hash(process.env.PARQUERM_ADMIN_PASSWORD,12).then(h=>process.stdout.write(h)).catch(e=>{console.error(e && e.stack || e); process.exit(1);});"
+    $oldPasswordEnv = $env:PARQUERM_ADMIN_PASSWORD
+    $env:PARQUERM_ADMIN_PASSWORD = $PlainTextPassword
+    try {
+        Push-Location $backendDir
+        try {
+            $hash = & $nodePath -e $script
+            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($hash)) {
+                Write-Log "ERROR: Failed to hash admin password." 'Red'
+                exit 1
+            }
+            return ($hash | Select-Object -First 1).Trim()
+        } finally {
+            Pop-Location
+        }
+    } finally {
+        $env:PARQUERM_ADMIN_PASSWORD = $oldPasswordEnv
+    }
+}
+
 function Write-Log([string]$msg, [string]$color = 'White') {
     $line = "[$(Get-Date -Format 'HH:mm:ss')] $msg"
     Write-Host $line -ForegroundColor $color
@@ -104,7 +162,12 @@ if ($services | Where-Object { $_.DisplayName -like '*SQL Server*' -and $_.Name 
     Write-Log "SQL Server already installed." 'Green'
 }
 
-if (-not $sqlServerInstalled -and -not $SkipSqlServerInstall) {
+if (-not $sqlServerInstalled -and -not $skipSqlInstallFlag) {
+    if ([string]::IsNullOrWhiteSpace($DbPassword)) {
+        Write-Log "ERROR: DbPassword is required to install SQL Server." 'Red'
+        exit 1
+    }
+
     $sqlExpressCache = Join-Path $RuntimeCacheDir 'sqlserver-express'
     $sqlSetup = Get-ChildItem $sqlExpressCache -Filter 'SQLEXPR*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
     if (-not $sqlSetup) {
@@ -148,7 +211,13 @@ if (-not $sqlcmd) {
 }
 Write-Log "Using sqlcmd: $sqlcmd" 'Gray'
 
+if ([string]::IsNullOrWhiteSpace($DbPassword)) {
+    Write-Log "ERROR: DbPassword is required to initialize database '$DbName'." 'Red'
+    exit 1
+}
+
 $sqlArgs = @('-S', 'localhost,1433', '-U', 'sa', '-P', $DbPassword)
+$AdminPasswordHash = New-BcryptHash $AdminPassword
 
 # --- Step 4: Create database --------------------------------------------------
 Write-Log "=== Step 3: Creating database '$DbName' ===" 'Cyan'
@@ -175,6 +244,53 @@ if (-not (Test-Path $InitScriptsDir)) {
         Write-Log "  [OK] $($f.Name)" 'Green'
     }
 }
+
+# --- Step 5b: Set installer-provided admin password ---------------------------
+Write-Log "=== Step 4b: Admin user password ===" 'Cyan'
+$adminHashSql = $AdminPasswordHash.Replace("'", "''")
+$setAdminPasswordSql = @"
+UPDATE dbo.users
+SET password_hash = N'$adminHashSql',
+    is_active = 1,
+    updated_at = SYSDATETIME()
+WHERE username = N'admin';
+
+IF @@ROWCOUNT = 0
+BEGIN
+    DECLARE @adminRoleId INT = (SELECT TOP 1 id FROM dbo.roles WHERE name = N'Administrador' ORDER BY id);
+    INSERT INTO dbo.users
+    (
+        role_id,
+        username,
+        password_hash,
+        full_name,
+        email,
+        is_active,
+        last_login_at,
+        created_at,
+        updated_at
+    )
+    VALUES
+    (
+        @adminRoleId,
+        N'admin',
+        N'$adminHashSql',
+        N'Administrador del Sistema',
+        N'admin@parquerm.local',
+        1,
+        NULL,
+        SYSDATETIME(),
+        SYSDATETIME()
+    );
+END
+"@
+
+& $sqlcmd @sqlArgs '-d' $DbName '-Q' $setAdminPasswordSql '-b' | Tee-Object -Append -FilePath $LogFile
+if ($LASTEXITCODE -ne 0) {
+    Write-Log "Failed to set admin user password." 'Red'
+    exit 1
+}
+Write-Log "Admin user password ready." 'Green'
 
 # --- Step 6: Run migrations ---------------------------------------------------
 Write-Log "=== Step 5: Migrations ===" 'Cyan'
