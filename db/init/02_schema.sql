@@ -22,7 +22,8 @@ BEGIN
         description NVARCHAR(255) NULL,
         is_active BIT NOT NULL DEFAULT 1,
         created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-        updated_at DATETIME2 NULL
+        updated_at DATETIME2 NULL,
+        deleted_at DATETIME2 NULL
     );
 END
 GO
@@ -65,6 +66,7 @@ BEGIN
         last_login_at DATETIME2 NULL,
         created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
         updated_at DATETIME2 NULL,
+        deleted_at DATETIME2 NULL,
 
         CONSTRAINT fk_users_role FOREIGN KEY (role_id) REFERENCES roles(id)
     );
@@ -130,7 +132,8 @@ BEGIN
         id INT IDENTITY(1,1) PRIMARY KEY,
         name NVARCHAR(120) NOT NULL UNIQUE,
         nationality NVARCHAR(120) NULL,
-        is_active BIT NOT NULL DEFAULT 1
+        is_active BIT NOT NULL DEFAULT 1,
+        deleted_at DATETIME2 NULL
     );
 END
 GO
@@ -140,7 +143,8 @@ BEGIN
     CREATE TABLE departments (
         id INT IDENTITY(1,1) PRIMARY KEY,
         name NVARCHAR(120) NOT NULL UNIQUE,
-        is_active BIT NOT NULL DEFAULT 1
+        is_active BIT NOT NULL DEFAULT 1,
+        deleted_at DATETIME2 NULL
     );
 END
 GO
@@ -152,6 +156,7 @@ BEGIN
         department_id INT NOT NULL,
         name NVARCHAR(120) NOT NULL,
         is_active BIT NOT NULL DEFAULT 1,
+        deleted_at DATETIME2 NULL,
 
         CONSTRAINT fk_municipalities_department FOREIGN KEY (department_id) REFERENCES departments(id),
         CONSTRAINT uq_municipality_department UNIQUE (department_id, name)
@@ -166,7 +171,8 @@ BEGIN
     CREATE TABLE visitor_categories (
         id INT IDENTITY(1,1) PRIMARY KEY,
         name NVARCHAR(120) NOT NULL UNIQUE,
-        is_active BIT NOT NULL DEFAULT 1
+        is_active BIT NOT NULL DEFAULT 1,
+        deleted_at DATETIME2 NULL
     );
 END
 GO
@@ -176,7 +182,8 @@ BEGIN
     CREATE TABLE vehicle_types (
         id INT IDENTITY(1,1) PRIMARY KEY,
         name NVARCHAR(120) NOT NULL UNIQUE,
-        is_active BIT NOT NULL DEFAULT 1
+        is_active BIT NOT NULL DEFAULT 1,
+        deleted_at DATETIME2 NULL
     );
 END
 GO
@@ -186,7 +193,8 @@ BEGIN
     CREATE TABLE lodging_types (
         id INT IDENTITY(1,1) PRIMARY KEY,
         name NVARCHAR(120) NOT NULL UNIQUE,
-        is_active BIT NOT NULL DEFAULT 1
+        is_active BIT NOT NULL DEFAULT 1,
+        deleted_at DATETIME2 NULL
     );
 END
 GO
@@ -196,7 +204,8 @@ BEGIN
     CREATE TABLE payment_methods (
         id INT IDENTITY(1,1) PRIMARY KEY,
         name NVARCHAR(120) NOT NULL UNIQUE,
-        is_active BIT NOT NULL DEFAULT 1
+        is_active BIT NOT NULL DEFAULT 1,
+        deleted_at DATETIME2 NULL
     );
 END
 GO
@@ -208,6 +217,7 @@ BEGIN
         type NVARCHAR(20) NOT NULL,
         name NVARCHAR(150) NOT NULL,
         is_active BIT NOT NULL DEFAULT 1,
+        deleted_at DATETIME2 NULL,
 
         CONSTRAINT ck_financial_concepts_type CHECK (type IN ('INGRESO', 'EGRESO'))
     );
@@ -219,7 +229,8 @@ BEGIN
     CREATE TABLE visit_reasons (
         id INT IDENTITY(1,1) PRIMARY KEY,
         name NVARCHAR(120) NOT NULL UNIQUE,
-        is_active BIT NOT NULL DEFAULT 1
+        is_active BIT NOT NULL DEFAULT 1,
+        deleted_at DATETIME2 NULL
     );
 END
 GO
@@ -229,7 +240,8 @@ BEGIN
     CREATE TABLE visit_activities (
         id INT IDENTITY(1,1) PRIMARY KEY,
         name NVARCHAR(120) NOT NULL UNIQUE,
-        is_active BIT NOT NULL DEFAULT 1
+        is_active BIT NOT NULL DEFAULT 1,
+        deleted_at DATETIME2 NULL
     );
 END
 GO
@@ -239,7 +251,8 @@ BEGIN
     CREATE TABLE info_sources (
         id INT IDENTITY(1,1) PRIMARY KEY,
         name NVARCHAR(120) NOT NULL UNIQUE,
-        is_active BIT NOT NULL DEFAULT 1
+        is_active BIT NOT NULL DEFAULT 1,
+        deleted_at DATETIME2 NULL
     );
 END
 GO
@@ -249,7 +262,8 @@ BEGIN
     CREATE TABLE travel_types (
         id INT IDENTITY(1,1) PRIMARY KEY,
         name NVARCHAR(120) NOT NULL UNIQUE,
-        is_active BIT NOT NULL DEFAULT 1
+        is_active BIT NOT NULL DEFAULT 1,
+        deleted_at DATETIME2 NULL
     );
 END
 GO
@@ -269,11 +283,12 @@ BEGIN
         lodging_type_id INT NULL,
         name NVARCHAR(150) NOT NULL,
         applies_to NVARCHAR(50) NOT NULL,
-        amount DECIMAL(12,2) NOT NULL,
-        is_foreign BIT NULL,
+        amount_local DECIMAL(12,2) NOT NULL,
+        amount_foreign DECIMAL(12,2) NOT NULL DEFAULT 0,
         is_active BIT NOT NULL DEFAULT 1,
         valid_from DATE NOT NULL DEFAULT CAST(GETDATE() AS DATE),
         valid_to DATE NULL,
+        deleted_at DATETIME2 NULL,
 
         CONSTRAINT fk_tariffs_service FOREIGN KEY (service_id) REFERENCES services(id),
         CONSTRAINT fk_tariffs_visitor_category FOREIGN KEY (visitor_category_id) REFERENCES visitor_categories(id),
@@ -326,6 +341,7 @@ BEGIN
         visit_type NVARCHAR(50) NULL,
         observations NVARCHAR(500) NULL,
 
+        is_foreign BIT NOT NULL DEFAULT 0,
         source NVARCHAR(50) NOT NULL DEFAULT 'MANUAL',
         external_event_id NVARCHAR(100) NULL,
 
@@ -397,7 +413,7 @@ BEGIN
         total_amount DECIMAL(12,2) NOT NULL,
 
         exit_enabled BIT NOT NULL DEFAULT 0,
-
+        is_foreign BIT NOT NULL DEFAULT 0,
         source NVARCHAR(50) NOT NULL DEFAULT 'MANUAL',
         external_event_id NVARCHAR(100) NULL,
 
@@ -435,6 +451,7 @@ BEGIN
         tariff_id INT NULL,
         applied_rate DECIMAL(12,2) NOT NULL,
         total_amount DECIMAL(12,2) NOT NULL,
+        is_foreign BIT NOT NULL DEFAULT 0,
 
         observations NVARCHAR(500) NULL,
         created_by_user_id INT NOT NULL,
@@ -657,6 +674,72 @@ IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('receipts')
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('receipts') AND name = 'discount_type')
     ALTER TABLE receipts ADD discount_type NVARCHAR(20) NULL;
+GO
+
+-- tariffs: dos precios (amount_local / amount_foreign) en lugar de amount + is_foreign (v3)
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('tariffs') AND name = 'amount_local')
+    ALTER TABLE tariffs ADD amount_local DECIMAL(12,2) NOT NULL DEFAULT 0;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('tariffs') AND name = 'amount_foreign')
+    ALTER TABLE tariffs ADD amount_foreign DECIMAL(12,2) NOT NULL DEFAULT 0;
+GO
+
+-- visitor/vehicle/lodging records: flag is_foreign (v3)
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('visitor_records') AND name = 'is_foreign')
+    ALTER TABLE visitor_records ADD is_foreign BIT NOT NULL DEFAULT 0;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('vehicle_records') AND name = 'is_foreign')
+    ALTER TABLE vehicle_records ADD is_foreign BIT NOT NULL DEFAULT 0;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('lodging_records') AND name = 'is_foreign')
+    ALTER TABLE lodging_records ADD is_foreign BIT NOT NULL DEFAULT 0;
+GO
+
+-- borrado lógico: deleted_at en todas las tablas gestionables (v4)
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('roles') AND name = 'deleted_at')
+    ALTER TABLE roles ADD deleted_at DATETIME2 NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'deleted_at')
+    ALTER TABLE users ADD deleted_at DATETIME2 NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('tariffs') AND name = 'deleted_at')
+    ALTER TABLE tariffs ADD deleted_at DATETIME2 NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('countries') AND name = 'deleted_at')
+    ALTER TABLE countries ADD deleted_at DATETIME2 NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('departments') AND name = 'deleted_at')
+    ALTER TABLE departments ADD deleted_at DATETIME2 NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('municipalities') AND name = 'deleted_at')
+    ALTER TABLE municipalities ADD deleted_at DATETIME2 NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('visitor_categories') AND name = 'deleted_at')
+    ALTER TABLE visitor_categories ADD deleted_at DATETIME2 NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('vehicle_types') AND name = 'deleted_at')
+    ALTER TABLE vehicle_types ADD deleted_at DATETIME2 NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('lodging_types') AND name = 'deleted_at')
+    ALTER TABLE lodging_types ADD deleted_at DATETIME2 NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('payment_methods') AND name = 'deleted_at')
+    ALTER TABLE payment_methods ADD deleted_at DATETIME2 NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('financial_concepts') AND name = 'deleted_at')
+    ALTER TABLE financial_concepts ADD deleted_at DATETIME2 NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('visit_reasons') AND name = 'deleted_at')
+    ALTER TABLE visit_reasons ADD deleted_at DATETIME2 NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('visit_activities') AND name = 'deleted_at')
+    ALTER TABLE visit_activities ADD deleted_at DATETIME2 NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('info_sources') AND name = 'deleted_at')
+    ALTER TABLE info_sources ADD deleted_at DATETIME2 NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('travel_types') AND name = 'deleted_at')
+    ALTER TABLE travel_types ADD deleted_at DATETIME2 NULL;
 GO
 
 PRINT '02_schema.sql ejecutado correctamente.';

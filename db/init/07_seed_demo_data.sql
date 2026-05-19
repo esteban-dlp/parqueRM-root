@@ -19,11 +19,10 @@ DECLARE @pmEfectivo     INT = (SELECT id FROM payment_methods WHERE name = 'Efec
 DECLARE @pmTarjeta      INT = (SELECT id FROM payment_methods WHERE name = 'Tarjeta');
 DECLARE @pmTransfer     INT = (SELECT id FROM payment_methods WHERE name = 'Transferencia');
 
-DECLARE @tarAdultoNac   INT = (SELECT id FROM tariffs WHERE name = 'Adulto nacional'      AND is_active = 1);
-DECLARE @tarEstudiante  INT = (SELECT id FROM tariffs WHERE name = 'Estudiante nacional'  AND is_active = 1);
-DECLARE @tarExtAdult    INT = (SELECT id FROM tariffs WHERE name = 'Adulto extranjero'    AND is_active = 1);
-DECLARE @tarMicrobus    INT = (SELECT id FROM tariffs WHERE name = N'Microbús'            AND is_active = 1);
-DECLARE @tarDormit      INT = (SELECT id FROM tariffs WHERE name = 'Dormitorio'           AND is_active = 1);
+DECLARE @tarAdulto      INT = (SELECT id FROM tariffs WHERE name = 'Adulto'       AND is_active = 1);
+DECLARE @tarEstudiante  INT = (SELECT id FROM tariffs WHERE name = 'Estudiante'   AND is_active = 1);
+DECLARE @tarMicrobus    INT = (SELECT id FROM tariffs WHERE name = N'Microbús'    AND is_active = 1);
+DECLARE @tarDormit      INT = (SELECT id FROM tariffs WHERE name = 'Dormitorio'   AND is_active = 1);
 
 DECLARE @fcVisitante    INT = (SELECT id FROM financial_concepts WHERE name = 'Ingreso por visitante');
 DECLARE @fcVehiculo     INT = (SELECT id FROM financial_concepts WHERE name = N'Ingreso por vehículo');
@@ -56,7 +55,7 @@ BEGIN
         'TKT-DEMO-001', CAST(SYSDATETIME() AS DATE), SYSDATETIME(),
         @countryGT, @deptSM, @munSRafael,
         2, 5,          -- En familia / Internet
-        1, 2, @tarAdultoNac, 20.00, 40.00,
+        1, 2, @tarAdulto, 20.00, 40.00,
         'FEMENINO', 'MANUAL', @adminId
     );
     SET @tmpId = SCOPE_IDENTITY();
@@ -131,14 +130,14 @@ BEGIN
         travel_type_id, info_source_id,
         nationality, full_name,
         visitor_category_id, quantity, tariff_id, applied_rate, total_amount,
-        source, created_by_user_id
+        is_foreign, source, created_by_user_id
     ) VALUES (
         'TKT-DEMO-003', CAST(SYSDATETIME() AS DATE), DATEADD(hour, -2, SYSDATETIME()),
         3,             -- Estados Unidos
         1, 5,          -- Solo / Internet
         'Estadounidense', 'John Smith',
-        5, 1, @tarExtAdult, 50.00, 50.00,
-        'MANUAL', @adminId
+        1, 1, @tarAdulto, 50.00, 50.00,
+        1, 'MANUAL', @adminId
     );
     SET @tmpId = SCOPE_IDENTITY();
     INSERT INTO visitor_record_reasons    VALUES (@tmpId, 1), (@tmpId, 5);   -- Naturaleza, Aventura

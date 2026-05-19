@@ -88,41 +88,31 @@ GO
 
 /* =========================
    CATEGORÍAS DE VISITANTES
+   La diferencia nacional/extranjero se maneja con is_foreign en el registro,
+   no duplicando categorías.
    ========================= */
 
-IF NOT EXISTS (SELECT 1 FROM visitor_categories WHERE name = 'Adulto nacional')
+IF NOT EXISTS (SELECT 1 FROM visitor_categories WHERE name = 'Adulto')
 BEGIN
-    INSERT INTO visitor_categories (name) VALUES ('Adulto nacional');
+    INSERT INTO visitor_categories (name) VALUES ('Adulto');
 END
 GO
 
-IF NOT EXISTS (SELECT 1 FROM visitor_categories WHERE name = 'Niño nacional')
+IF NOT EXISTS (SELECT 1 FROM visitor_categories WHERE name = 'Niño')
 BEGIN
-    INSERT INTO visitor_categories (name) VALUES ('Niño nacional');
+    INSERT INTO visitor_categories (name) VALUES ('Niño');
 END
 GO
 
-IF NOT EXISTS (SELECT 1 FROM visitor_categories WHERE name = 'Estudiante nacional')
+IF NOT EXISTS (SELECT 1 FROM visitor_categories WHERE name = 'Estudiante')
 BEGIN
-    INSERT INTO visitor_categories (name) VALUES ('Estudiante nacional');
+    INSERT INTO visitor_categories (name) VALUES ('Estudiante');
 END
 GO
 
-IF NOT EXISTS (SELECT 1 FROM visitor_categories WHERE name = 'Adulto mayor nacional')
+IF NOT EXISTS (SELECT 1 FROM visitor_categories WHERE name = 'Adulto mayor')
 BEGIN
-    INSERT INTO visitor_categories (name) VALUES ('Adulto mayor nacional');
-END
-GO
-
-IF NOT EXISTS (SELECT 1 FROM visitor_categories WHERE name = 'Adulto extranjero')
-BEGIN
-    INSERT INTO visitor_categories (name) VALUES ('Adulto extranjero');
-END
-GO
-
-IF NOT EXISTS (SELECT 1 FROM visitor_categories WHERE name = 'Niño extranjero')
-BEGIN
-    INSERT INTO visitor_categories (name) VALUES ('Niño extranjero');
+    INSERT INTO visitor_categories (name) VALUES ('Adulto mayor');
 END
 GO
 
