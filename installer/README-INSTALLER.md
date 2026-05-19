@@ -55,7 +55,7 @@ The same installer handles both cases.
 | SQL Server | Installed from runtime cache | Reused if present |
 | Database | Created and seeded | Existing data kept; missing init/migrations are applied |
 | Backend `.env` | Generated | Regenerated for current IP/password; existing JWT secrets preserved |
-| Frontend `config.json` | Generated | Regenerated for current IP |
+| Frontend `config.json` | Generated with same-origin `/api` | Regenerated with same-origin `/api` |
 | Services | Installed | Reinstalled and restarted |
 | Runtime binaries | Installed | Refreshed from installer |
 
@@ -87,13 +87,15 @@ The installer writes:
 - `C:\ParqueRM\app\frontend\dist\config.json`
 - `C:\ParqueRM\config\parquerm.config.json`
 
-The frontend runtime config points to:
+The frontend runtime config points to the same origin:
 
 ```text
-http://<server-ip>:3000/api
+/api
 ```
 
-If the server IP changes after installation, run:
+Caddy serves the frontend on port 80 and proxies `/api/*` to the local backend service on port 3000. This means the browser can open ParqueRM through `localhost`, the current LAN IP, or a future DHCP-assigned IP without changing the frontend API URL.
+
+If you still want to refresh the displayed LAN URLs after the server IP changes, run:
 
 ```bat
 C:\ParqueRM\tools\change-server-ip.bat

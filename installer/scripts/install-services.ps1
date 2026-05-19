@@ -80,20 +80,25 @@ Write-Host "Using Caddy: $caddyPath" -ForegroundColor Gray
 
 # --- Caddyfile ----------------------------------------------------------------
 $caddyFile = Join-Path $InstallDir 'config\Caddyfile'
-if (-not (Test-Path $caddyFile)) {
-    $caddyContent = @"
+$caddyContent = @"
 :80 {
-    root * $($FrontendDist -replace '\\', '/')
-    file_server
-    try_files {path} /index.html
+    handle /api/* {
+        reverse_proxy 127.0.0.1:3000
+    }
+
+    handle {
+        root * $($FrontendDist -replace '\\', '/')
+        try_files {path} /index.html
+        file_server
+    }
+
     log {
         output file $($LogFrontend -replace '\\', '/')/access.log
     }
 }
 "@
-    $caddyContent | Out-File -FilePath $caddyFile -Encoding utf8
-    Write-Host "  Created Caddyfile: $caddyFile" -ForegroundColor Green
-}
+$caddyContent | Out-File -FilePath $caddyFile -Encoding utf8
+Write-Host "  Wrote Caddyfile: $caddyFile" -ForegroundColor Green
 
 # --- Helper: install one WinSW service ---------------------------------------
 function Install-WinSwService {
@@ -268,6 +273,7 @@ Wait-HttpOk 'Backend health' 'http://127.0.0.1:3000/api/health' 90
 
 Start-ParqueService 'ParqueRMFrontend'
 Wait-HttpOk 'Frontend' 'http://127.0.0.1/' 45
+Wait-HttpOk 'Frontend API proxy' 'http://127.0.0.1/api/health' 45
 
 foreach ($svcName in @('ParqueRMBackend', 'ParqueRMFrontend')) {
     $svc = Get-Service -Name $svcName -ErrorAction Stop

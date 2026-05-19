@@ -107,8 +107,9 @@ if ([string]::IsNullOrWhiteSpace($JwtRefreshSecret) -or $JwtRefreshSecret.Length
 
 # --- URL assembly -------------------------------------------------------------
 $FrontendUrl = if ($FrontendPort -eq 80) { "http://$ServerIp" } else { "http://${ServerIp}:$FrontendPort" }
-$BackendUrl  = "http://${ServerIp}:$BackendPort/api"
-$SwaggerUrl  = "http://${ServerIp}:$BackendPort/api/docs"
+$BackendUrl  = "$FrontendUrl/api"
+$SwaggerUrl  = "$FrontendUrl/api/docs"
+$FrontendApiUrl = '/api'
 
 # --- Backend .env -------------------------------------------------------------
 $envContent = @"
@@ -131,7 +132,9 @@ $envContent | Out-File -FilePath $envPath -Encoding utf8 -NoNewline
 Write-Host "  [OK] Backend .env -> $envPath" -ForegroundColor Green
 
 # --- Frontend config.json -----------------------------------------------------
-$frontendConfig = [ordered]@{ apiUrl = $BackendUrl } | ConvertTo-Json -Depth 2
+# Use a same-origin API path so the app keeps working if DHCP changes the LAN IP.
+# Caddy proxies /api/* to the local backend service.
+$frontendConfig = [ordered]@{ apiUrl = $FrontendApiUrl } | ConvertTo-Json -Depth 2
 $frontendConfigPath = Join-Path $FrontendDist 'config.json'
 $frontendConfig | Out-File -FilePath $frontendConfigPath -Encoding utf8 -NoNewline
 Write-Host "  [OK] Frontend config.json -> $frontendConfigPath" -ForegroundColor Green

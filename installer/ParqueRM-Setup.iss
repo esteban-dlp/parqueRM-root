@@ -215,23 +215,25 @@ var
   tmpFile: String;
   rc: Integer;
   ps: String;
+  detectedIp: AnsiString;
 begin
   Result := '';
   tmpFile := ExpandConstant('{tmp}\parquerm-detected-ip.txt');
   ps :=
-    "$patterns='vEthernet','VMware','VirtualBox','Hyper-V','WSL','Loopback','Pseudo','Bluetooth','Teredo','ISATAP','Microsoft Wi-Fi Direct','WAN Miniport','Tunnel';" +
-    "$ips=Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -notmatch '^127\.' -and $_.IPAddress -notmatch '^169\.254\.' -and $_.PrefixOrigin -ne 'WellKnown' -and $_.SuffixOrigin -ne 'Random' } | ForEach-Object { $a=Get-NetAdapter -InterfaceIndex $_.InterfaceIndex -ErrorAction SilentlyContinue; if ($a -and $a.Status -eq 'Up') { $name=$a.Name + ' ' + $a.InterfaceDescription; $virtual=$false; foreach($p in $patterns){ if($name -like ('*'+$p+'*')){ $virtual=$true } }; if(-not $virtual){ [pscustomobject]@{ IP=$_.IPAddress; Name=$name } } } };" +
-    "$wired=$ips | Where-Object { $_.Name -notmatch 'Wi-Fi|Wireless|802\.11|WLAN' } | Select-Object -First 1;" +
-    "$pick=if($wired){$wired}else{$ips|Select-Object -First 1};" +
-    "if($pick){ Set-Content -Path '" + tmpFile + "' -Value $pick.IP -Encoding ASCII }";
+    '$patterns=''vEthernet'',''VMware'',''VirtualBox'',''Hyper-V'',''WSL'',''Loopback'',''Pseudo'',''Bluetooth'',''Teredo'',''ISATAP'',''Microsoft Wi-Fi Direct'',''WAN Miniport'',''Tunnel'';' +
+    '$ips=Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -notmatch ''^127\.'' -and $_.IPAddress -notmatch ''^169\.254\.'' -and $_.PrefixOrigin -ne ''WellKnown'' -and $_.SuffixOrigin -ne ''Random'' } | ForEach-Object { $a=Get-NetAdapter -InterfaceIndex $_.InterfaceIndex -ErrorAction SilentlyContinue; if ($a -and $a.Status -eq ''Up'') { $name=$a.Name + '' '' + $a.InterfaceDescription; $virtual=$false; foreach($p in $patterns){ if($name -like (''*''+$p+''*'')){ $virtual=$true } }; if(-not $virtual){ [pscustomobject]@{ IP=$_.IPAddress; Name=$name } } } };' +
+    '$wired=$ips | Where-Object { $_.Name -notmatch ''Wi-Fi|Wireless|802\.11|WLAN'' } | Select-Object -First 1;' +
+    '$pick=if($wired){$wired}else{$ips|Select-Object -First 1};' +
+    'if($pick){ Set-Content -Path ''' + tmpFile + ''' -Value $pick.IP -Encoding ASCII }';
 
   Exec('powershell.exe',
     '-NoProfile -ExecutionPolicy Bypass -Command "' + ps + '"',
     '', SW_HIDE, ewWaitUntilTerminated, rc);
 
   if FileExists(tmpFile) then begin
-    LoadStringFromFile(tmpFile, Result);
-    Result := Trim(Result);
+    if LoadStringFromFile(tmpFile, detectedIp) then begin
+      Result := Trim(String(detectedIp));
+    end;
   end;
 end;
 
