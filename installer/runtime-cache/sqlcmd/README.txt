@@ -7,7 +7,7 @@ If SQL Server is installed with default tools, sqlcmd.exe is usually found at:
   C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\170\Tools\Binn\sqlcmd.exe
   C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\160\Tools\Binn\sqlcmd.exe
 
-The scripts (initialize-db.ps1, run-migrations.ps1, apply-update.ps1) search for
+The scripts (initialize-db.ps1, run-migrations.ps1) search for
 sqlcmd in this priority order:
   1. C:\ParqueRM\runtime\sqlcmd\sqlcmd.exe    (this folder after install)
   2. PATH (system-wide sqlcmd)

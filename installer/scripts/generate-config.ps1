@@ -36,18 +36,15 @@
 #>
 param(
     [string]$InstallDir      = 'C:\ParqueRM',
-    [Parameter(Mandatory)]
-    [string]$ServerIp,
+    [string]$ServerIp        = '',
     [int]$FrontendPort       = 80,
     [int]$BackendPort        = 3000,
     [string]$DbName          = 'ParqueRM',
     [string]$DbUser          = 'sa',
-    [Parameter(Mandatory)]
-    [string]$DbPassword,
-    [Parameter(Mandatory)]
-    [string]$JwtSecret,
-    [Parameter(Mandatory)]
-    [string]$JwtRefreshSecret
+    [string]$DbPassword      = '',
+    [string]$JwtSecret       = '',
+    [string]$JwtRefreshSecret = '',
+    [switch]$PreserveExistingSecrets
 )
 
 Set-StrictMode -Version Latest
@@ -62,34 +59,82 @@ foreach ($dir in @($BackendDir, $FrontendDist, $ConfigDir)) {
     if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
 }
 
+function Read-DotEnvValue([string]$Path, [string]$Key) {
+    if (-not (Test-Path $Path)) { return '' }
+    $line = Get-Content $Path | Where-Object { $_ -match "^$([regex]::Escape($Key))=" } | Select-Object -First 1
+    if (-not $line) { return '' }
+    $value = ($line -split '=', 2)[1]
+    if ($value.Length -ge 2) {
+        $first = $value.Substring(0, 1)
+        $last = $value.Substring($value.Length - 1, 1)
+        if (($first -eq '"' -and $last -eq '"') -or ($first -eq "'" -and $last -eq "'")) {
+            $value = $value.Substring(1, $value.Length - 2)
+        }
+    }
+    return $value
+}
+
+function ConvertTo-DotEnvValue([string]$Value) {
+    $escaped = $Value -replace '\\', '\\' -replace '"', '\"'
+    return '"' + $escaped + '"'
+}
+
+$envPath = Join-Path $BackendDir '.env'
+if ($PreserveExistingSecrets -and (Test-Path $envPath)) {
+    $existingJwtSecret = Read-DotEnvValue $envPath 'JWT_SECRET'
+    $existingJwtRefreshSecret = Read-DotEnvValue $envPath 'JWT_REFRESH_SECRET'
+
+    if (-not [string]::IsNullOrWhiteSpace($existingJwtSecret)) { $JwtSecret = $existingJwtSecret }
+    if (-not [string]::IsNullOrWhiteSpace($existingJwtRefreshSecret)) { $JwtRefreshSecret = $existingJwtRefreshSecret }
+}
+
+if ([string]::IsNullOrWhiteSpace($ServerIp)) {
+    Write-Error "ServerIp is required."
+    exit 1
+}
+if ([string]::IsNullOrWhiteSpace($DbPassword)) {
+    Write-Error "DbPassword is required."
+    exit 1
+}
+if ([string]::IsNullOrWhiteSpace($JwtSecret) -or $JwtSecret.Length -lt 16) {
+    Write-Error "JwtSecret is required and must be at least 16 characters."
+    exit 1
+}
+if ([string]::IsNullOrWhiteSpace($JwtRefreshSecret) -or $JwtRefreshSecret.Length -lt 16) {
+    Write-Error "JwtRefreshSecret is required and must be at least 16 characters."
+    exit 1
+}
+
 # --- URL assembly -------------------------------------------------------------
 $FrontendUrl = if ($FrontendPort -eq 80) { "http://$ServerIp" } else { "http://${ServerIp}:$FrontendPort" }
-$BackendUrl  = "http://${ServerIp}:$BackendPort/api"
-$SwaggerUrl  = "http://${ServerIp}:$BackendPort/api/docs"
+$BackendUrl  = "$FrontendUrl/api"
+$SwaggerUrl  = "$FrontendUrl/api/docs"
+$FrontendApiUrl = '/api'
 
 # --- Backend .env -------------------------------------------------------------
 $envContent = @"
 NODE_ENV=production
 HOST=0.0.0.0
 PORT=$BackendPort
-DB_HOST=localhost
+DB_HOST="localhost"
 DB_PORT=1433
-DB_USER=$DbUser
-DB_PASSWORD=$DbPassword
-DB_NAME=$DbName
-JWT_SECRET=$JwtSecret
-JWT_REFRESH_SECRET=$JwtRefreshSecret
-CORS_ORIGIN=$FrontendUrl
-PUBLIC_FRONTEND_URL=$FrontendUrl
-PUBLIC_BACKEND_URL=$BackendUrl
+DB_USER=$(ConvertTo-DotEnvValue $DbUser)
+DB_PASSWORD=$(ConvertTo-DotEnvValue $DbPassword)
+DB_NAME=$(ConvertTo-DotEnvValue $DbName)
+JWT_SECRET=$(ConvertTo-DotEnvValue $JwtSecret)
+JWT_REFRESH_SECRET=$(ConvertTo-DotEnvValue $JwtRefreshSecret)
+CORS_ORIGIN=$(ConvertTo-DotEnvValue $FrontendUrl)
+PUBLIC_FRONTEND_URL=$(ConvertTo-DotEnvValue $FrontendUrl)
+PUBLIC_BACKEND_URL=$(ConvertTo-DotEnvValue $BackendUrl)
 "@
 
-$envPath = Join-Path $BackendDir '.env'
 $envContent | Out-File -FilePath $envPath -Encoding utf8 -NoNewline
 Write-Host "  [OK] Backend .env -> $envPath" -ForegroundColor Green
 
 # --- Frontend config.json -----------------------------------------------------
-$frontendConfig = [ordered]@{ apiUrl = $BackendUrl } | ConvertTo-Json -Depth 2
+# Use a same-origin API path so the app keeps working if DHCP changes the LAN IP.
+# Caddy proxies /api/* to the local backend service.
+$frontendConfig = [ordered]@{ apiUrl = $FrontendApiUrl } | ConvertTo-Json -Depth 2
 $frontendConfigPath = Join-Path $FrontendDist 'config.json'
 $frontendConfig | Out-File -FilePath $frontendConfigPath -Encoding utf8 -NoNewline
 Write-Host "  [OK] Frontend config.json -> $frontendConfigPath" -ForegroundColor Green

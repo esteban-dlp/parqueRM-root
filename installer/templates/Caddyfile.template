@@ -1,7 +1,14 @@
 :{{FRONTEND_PORT}} {
-    root * {{FRONTEND_DIST_PATH}}
-    file_server
-    try_files {path} /index.html
+    handle /api/* {
+        reverse_proxy 127.0.0.1:{{BACKEND_PORT}}
+    }
+
+    handle {
+        root * {{FRONTEND_DIST_PATH}}
+        try_files {path} /index.html
+        file_server
+    }
+
     log {
         output file {{LOG_DIR}}/access.log
         format console
