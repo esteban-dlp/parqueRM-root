@@ -742,5 +742,29 @@ IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('travel_typ
     ALTER TABLE travel_types ADD deleted_at DATETIME2 NULL;
 GO
 
+/* =========================
+   ACOMPAÑANTES DE VISITANTE
+   ========================= */
+
+IF OBJECT_ID('visitor_record_companions', 'U') IS NULL
+BEGIN
+    CREATE TABLE visitor_record_companions (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        visitor_record_id INT NOT NULL,
+        visitor_category_id INT NOT NULL,
+        quantity INT NOT NULL DEFAULT 1,
+        applied_rate DECIMAL(12,2) NOT NULL,
+        total_amount DECIMAL(12,2) NOT NULL,
+        is_foreign BIT NOT NULL DEFAULT 0,
+        created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+
+        CONSTRAINT fk_vrc_visitor_record FOREIGN KEY (visitor_record_id) REFERENCES visitor_records(id) ON DELETE CASCADE,
+        CONSTRAINT fk_vrc_visitor_category FOREIGN KEY (visitor_category_id) REFERENCES visitor_categories(id)
+    );
+
+    CREATE INDEX ix_vrc_visitor_record_id ON visitor_record_companions(visitor_record_id);
+END
+GO
+
 PRINT '02_schema.sql ejecutado correctamente.';
 GO
