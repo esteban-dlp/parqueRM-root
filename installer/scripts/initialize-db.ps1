@@ -75,6 +75,10 @@ if ([string]::IsNullOrWhiteSpace($MigrationsDir)) {
 $LogDir = Join-Path $InstallDir 'logs\db-init'
 if (-not (Test-Path $LogDir)) { New-Item -ItemType Directory -Path $LogDir -Force | Out-Null }
 $LogFile = Join-Path $LogDir "db-init-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
+$ConfigDir = Join-Path $InstallDir 'config'
+if (-not (Test-Path $ConfigDir)) { New-Item -ItemType Directory -Path $ConfigDir -Force | Out-Null }
+$DbReadyPath = Join-Path $ConfigDir 'db-ready.json'
+Remove-Item -Path $DbReadyPath -Force -ErrorAction SilentlyContinue
 
 $skipSqlInstallFlag = $false
 if ($SkipSqlServerInstall -match '^(1|true|yes)$') { $skipSqlInstallFlag = $true }
@@ -140,6 +144,150 @@ function Write-Log([string]$msg, [string]$color = 'White') {
     Add-Content -Path $LogFile -Value $line
 }
 
+function ConvertTo-SqlLiteral([string]$Value) {
+    return "N'$($Value.Replace("'", "''"))'"
+}
+
+function Get-SqlEngineServices {
+    @(Get-Service -Name 'MSSQL*' -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.Name -eq 'MSSQLSERVER' -or $_.Name -like 'MSSQL$*'
+        } |
+        Sort-Object @{ Expression = { if ($_.Name -eq 'MSSQLSERVER') { 0 } else { 1 } } }, Name)
+}
+
+function Get-SqlInstanceName([string]$ServiceName) {
+    if ($ServiceName -eq 'MSSQLSERVER') { return 'MSSQLSERVER' }
+    if ($ServiceName -like 'MSSQL$*') { return $ServiceName.Substring(6) }
+    return ''
+}
+
+function Get-SqlInstanceRegistryId([string]$InstanceName) {
+    $instanceNamesPath = 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL'
+    if (-not (Test-Path $instanceNamesPath)) { return '' }
+    try {
+        $props = Get-ItemProperty -Path $instanceNamesPath -ErrorAction Stop
+        return [string]$props.$InstanceName
+    } catch {
+        return ''
+    }
+}
+
+function Enable-SqlTcpPort1433([string]$ServiceName) {
+    $instanceName = Get-SqlInstanceName $ServiceName
+    $instanceId = Get-SqlInstanceRegistryId $instanceName
+    if ([string]::IsNullOrWhiteSpace($instanceId)) {
+        Write-Log "WARNING: Could not find SQL registry instance id for '$instanceName'. TCP port configuration skipped." 'Yellow'
+        return $false
+    }
+
+    $tcpRoot = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$instanceId\MSSQLServer\SuperSocketNetLib\Tcp"
+    $ipAll = Join-Path $tcpRoot 'IPAll'
+    if (-not (Test-Path $ipAll)) {
+        Write-Log "WARNING: SQL TCP registry path not found: $ipAll" 'Yellow'
+        return $false
+    }
+
+    Write-Log "Configuring SQL Server TCP/IP on 127.0.0.1:1433 for instance '$instanceName'..." 'Yellow'
+    Set-ItemProperty -Path $tcpRoot -Name Enabled -Value 1 -ErrorAction SilentlyContinue
+    Get-ChildItem -Path $tcpRoot -ErrorAction SilentlyContinue |
+        Where-Object { $_.PSChildName -like 'IP*' -and $_.PSChildName -ne 'IPAll' } |
+        ForEach-Object {
+            Set-ItemProperty -Path $_.PSPath -Name Enabled -Value 1 -ErrorAction SilentlyContinue
+            Set-ItemProperty -Path $_.PSPath -Name Active -Value 1 -ErrorAction SilentlyContinue
+        }
+    Set-ItemProperty -Path $ipAll -Name TcpDynamicPorts -Value '' -ErrorAction Stop
+    Set-ItemProperty -Path $ipAll -Name TcpPort -Value '1433' -ErrorAction Stop
+    return $true
+}
+
+function Restart-SqlServiceAndWait([string]$ServiceName) {
+    Write-Log "Restarting SQL Server service $ServiceName..." 'Yellow'
+    Restart-Service -Name $ServiceName -Force -ErrorAction Stop
+    $deadline = (Get-Date).AddSeconds(90)
+    do {
+        $svcNow = Get-Service -Name $ServiceName -ErrorAction Stop
+        if ($svcNow.Status -eq 'Running') {
+            Start-Sleep -Seconds 3
+            Write-Log "SQL Server service $ServiceName is running." 'Green'
+            return
+        }
+        Start-Sleep -Seconds 2
+    } while ((Get-Date) -lt $deadline)
+
+    Write-Log "ERROR: SQL Server service $ServiceName did not return to Running state." 'Red'
+    exit 1
+}
+
+function Test-LocalSqlTcp {
+    try {
+        return (Test-NetConnection -ComputerName '127.0.0.1' -Port 1433 -InformationLevel Quiet -WarningAction SilentlyContinue)
+    } catch {
+        return $false
+    }
+}
+
+function Invoke-SqlcmdChecked {
+    param(
+        [string[]]$Arguments,
+        [string]$FailureMessage
+    )
+
+    $output = & $sqlcmd @Arguments 2>&1
+    $exitCode = $LASTEXITCODE
+    if ($output) {
+        $output | ForEach-Object { Add-Content -Path $LogFile -Value $_ }
+    }
+    if ($exitCode -ne 0) {
+        Write-Log $FailureMessage 'Red'
+        if ($output) {
+            $output | Select-Object -Last 8 | ForEach-Object { Write-Log "  $_" 'Red' }
+        }
+        exit 1
+    }
+    return $output
+}
+
+function Test-SaLogin([string[]]$Arguments) {
+    $output = & $sqlcmd @Arguments '-Q' 'SELECT 1' '-b' 2>&1
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0 -and $output) {
+        $output | ForEach-Object { Add-Content -Path $LogFile -Value $_ }
+    }
+    return ($exitCode -eq 0)
+}
+
+function Repair-SaLoginWithWindowsAuth([string]$Password) {
+    $passwordLiteral = ConvertTo-SqlLiteral $Password
+    $instanceId = Get-SqlInstanceRegistryId $sqlInstanceName
+    if (-not [string]::IsNullOrWhiteSpace($instanceId)) {
+        $loginModePath = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$instanceId\MSSQLServer"
+        if (Test-Path $loginModePath) {
+            Set-ItemProperty -Path $loginModePath -Name LoginMode -Value 2 -ErrorAction SilentlyContinue
+        }
+    }
+    $repairSql = @"
+ALTER LOGIN [sa] ENABLE;
+ALTER LOGIN [sa] WITH PASSWORD=$passwordLiteral UNLOCK;
+"@
+
+    Write-Log "Attempting to enable/update SQL 'sa' login using Windows authentication..." 'Yellow'
+    $output = & $sqlcmd '-S' '127.0.0.1,1433' '-E' '-Q' $repairSql '-b' 2>&1
+    $exitCode = $LASTEXITCODE
+    if ($output) {
+        $output | ForEach-Object { Add-Content -Path $LogFile -Value $_ }
+    }
+    if ($exitCode -ne 0) {
+        Write-Log "ERROR: Could not login with 'sa', and Windows authentication could not repair it." 'Red'
+        Write-Log "       If SQL Server was already installed, enter the current SQL 'sa' password or reset it manually." 'Yellow'
+        if ($output) {
+            $output | Select-Object -Last 8 | ForEach-Object { Write-Log "  $_" 'Red' }
+        }
+        exit 1
+    }
+    return $true
+}
+
 # --- Locate sqlcmd ------------------------------------------------------------
 $sqlcmdCmd = Get-Command sqlcmd -ErrorAction SilentlyContinue
 $sqlcmd = if ($sqlcmdCmd) { $sqlcmdCmd.Source } else { $null }
@@ -156,10 +304,10 @@ if (-not $sqlcmd) {
 Write-Log "=== Step 1: SQL Server Express ===" 'Cyan'
 
 $sqlServerInstalled = $false
-$services = Get-Service -Name 'MSSQL*' -ErrorAction SilentlyContinue
-if ($services | Where-Object { $_.DisplayName -like '*SQL Server*' -and $_.Name -notlike '*Agent*' -and $_.Name -notlike '*Browser*' }) {
+$engineServices = Get-SqlEngineServices
+if ($engineServices.Count -gt 0) {
     $sqlServerInstalled = $true
-    Write-Log "SQL Server already installed." 'Green'
+    Write-Log "SQL Server already installed: $($engineServices.Name -join ', ')" 'Green'
 }
 
 if (-not $sqlServerInstalled -and -not $skipSqlInstallFlag) {
@@ -191,15 +339,18 @@ if (-not $sqlServerInstalled -and -not $skipSqlInstallFlag) {
 
 # --- Step 2: Ensure SQL Server service is running -----------------------------
 Write-Log "=== Step 2: SQL Server service ===" 'Cyan'
-$svc = Get-Service -Name 'MSSQLSERVER' -ErrorAction SilentlyContinue
-if (-not $svc) { $svc = Get-Service -Name 'MSSQL$SQLEXPRESS' -ErrorAction SilentlyContinue }
+$engineServices = Get-SqlEngineServices
+$svc = $engineServices | Select-Object -First 1
 if (-not $svc) {
     Write-Log "ERROR: Could not find SQL Server service. Check installation." 'Red'
     exit 1
 }
+$sqlServiceName = $svc.Name
+$sqlInstanceName = Get-SqlInstanceName $sqlServiceName
+Write-Log "Using SQL Server service: $sqlServiceName (instance: $sqlInstanceName)" 'Gray'
 if ($svc.Status -ne 'Running') {
-    Write-Log "Starting SQL Server service $($svc.Name)..." 'Yellow'
-    Start-Service $svc.Name
+    Write-Log "Starting SQL Server service $sqlServiceName..." 'Yellow'
+    Start-Service $sqlServiceName
     Start-Sleep -Seconds 5
 }
 Write-Log "SQL Server service is running." 'Green'
@@ -216,14 +367,34 @@ if ([string]::IsNullOrWhiteSpace($DbPassword)) {
     exit 1
 }
 
-$sqlArgs = @('-S', 'localhost,1433', '-U', 'sa', '-P', $DbPassword)
+if (Enable-SqlTcpPort1433 $sqlServiceName) {
+    Restart-SqlServiceAndWait $sqlServiceName
+}
+
+if (-not (Test-LocalSqlTcp)) {
+    Write-Log "ERROR: SQL Server is not listening on 127.0.0.1:1433." 'Red'
+    Write-Log "       Check SQL Server TCP/IP configuration and make sure no other process is using port 1433." 'Yellow'
+    exit 1
+}
+Write-Log "SQL Server is listening on 127.0.0.1:1433." 'Green'
+
+$sqlArgs = @('-S', '127.0.0.1,1433', '-U', 'sa', '-P', $DbPassword)
+if (-not (Test-SaLogin $sqlArgs)) {
+    Repair-SaLoginWithWindowsAuth $DbPassword | Out-Null
+    Restart-SqlServiceAndWait $sqlServiceName
+    if (-not (Test-SaLogin $sqlArgs)) {
+        Write-Log "ERROR: SQL 'sa' login still failed after repair attempt." 'Red'
+        exit 1
+    }
+}
+Write-Log "SQL 'sa' login verified." 'Green'
+
 $AdminPasswordHash = New-BcryptHash $AdminPassword
 
 # --- Step 4: Create database --------------------------------------------------
 Write-Log "=== Step 3: Creating database '$DbName' ===" 'Cyan'
 $createDb = "IF DB_ID('$DbName') IS NULL BEGIN CREATE DATABASE [$DbName]; END"
-& $sqlcmd @sqlArgs '-Q' $createDb '-b'
-if ($LASTEXITCODE -ne 0) { Write-Log "Failed to create database." 'Red'; exit 1 }
+Invoke-SqlcmdChecked -Arguments ($sqlArgs + @('-Q', $createDb, '-b')) -FailureMessage "Failed to create database '$DbName'." | Out-Null
 Write-Log "Database '$DbName' ready." 'Green'
 
 # --- Step 5: Run init scripts -------------------------------------------------
@@ -236,11 +407,7 @@ if (-not (Test-Path $InitScriptsDir)) {
 
     foreach ($f in $initFiles) {
         Write-Log "  Running $($f.Name) ..." 'Yellow'
-        & $sqlcmd @sqlArgs '-d' $DbName '-i' $f.FullName '-b' | Tee-Object -Append -FilePath $LogFile
-        if ($LASTEXITCODE -ne 0) {
-            Write-Log "Init script failed: $($f.Name)" 'Red'
-            exit 1
-        }
+        Invoke-SqlcmdChecked -Arguments ($sqlArgs + @('-d', $DbName, '-i', $f.FullName, '-b')) -FailureMessage "Init script failed: $($f.Name)" | Out-Null
         Write-Log "  [OK] $($f.Name)" 'Green'
     }
 }
@@ -285,18 +452,14 @@ BEGIN
 END
 "@
 
-& $sqlcmd @sqlArgs '-d' $DbName '-Q' $setAdminPasswordSql '-b' | Tee-Object -Append -FilePath $LogFile
-if ($LASTEXITCODE -ne 0) {
-    Write-Log "Failed to set admin user password." 'Red'
-    exit 1
-}
+Invoke-SqlcmdChecked -Arguments ($sqlArgs + @('-d', $DbName, '-Q', $setAdminPasswordSql, '-b')) -FailureMessage 'Failed to set admin user password.' | Out-Null
 Write-Log "Admin user password ready." 'Green'
 
 # --- Step 6: Run migrations ---------------------------------------------------
 Write-Log "=== Step 5: Migrations ===" 'Cyan'
 $migrateScript = Join-Path $ScriptDir 'run-migrations.ps1'
 if (Test-Path $migrateScript) {
-    & $migrateScript -DbPassword $DbPassword -DbName $DbName -MigrationsDir $MigrationsDir
+    & $migrateScript -SqlcmdPath $sqlcmd -DbHost '127.0.0.1' -DbPassword $DbPassword -DbName $DbName -MigrationsDir $MigrationsDir
     if ($LASTEXITCODE -ne 0) { Write-Log "Migration step failed." 'Red'; exit 1 }
 } else {
     Write-Log "run-migrations.ps1 not found -- skipping." 'Yellow'
@@ -304,3 +467,13 @@ if (Test-Path $migrateScript) {
 
 Write-Log "=== Database initialization complete ===" 'Green'
 Write-Log "Log file: $LogFile" 'Gray'
+
+$dbReady = [ordered]@{
+    database    = $DbName
+    server      = '127.0.0.1,1433'
+    service     = $sqlServiceName
+    instance    = $sqlInstanceName
+    completedAt = (Get-Date).ToString('s')
+} | ConvertTo-Json -Depth 2
+$dbReady | Out-File -FilePath $DbReadyPath -Encoding utf8 -NoNewline
+Write-Log "DB readiness marker written: $DbReadyPath" 'Gray'

@@ -16,7 +16,7 @@
     Path to sqlcmd.exe. Default: searches PATH then runtime tools.
 
 .PARAMETER DbHost
-    SQL Server host. Default: localhost
+    SQL Server host. Default: 127.0.0.1
 
 .PARAMETER DbPort
     SQL Server port. Default: 1433
@@ -33,7 +33,7 @@
 param(
     [string]$MigrationsDir = '',
     [string]$SqlcmdPath    = '',
-    [string]$DbHost        = 'localhost',
+    [string]$DbHost        = '127.0.0.1',
     [int]$DbPort           = 1433,
     [string]$DbUser        = 'sa',
     [Parameter(Mandatory)]

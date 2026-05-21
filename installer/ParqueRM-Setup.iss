@@ -167,7 +167,15 @@ Filename: "powershell.exe"; \
   StatusMsg: "Instalando servicios de Windows..."; \
   Components: server
 
-; --- Step 5: Show final URLs (visible window so user sees the result) ----------
+; --- Step 5: Register startup task (auto-IP-update on reboot) -----------------
+Filename: "powershell.exe"; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\tools\installer-scripts\register-startup-task.ps1"" \
+    -InstallDir ""{app}"""; \
+  Flags: runhidden waituntilterminated; \
+  StatusMsg: "Registrando tarea de inicio automatico..."; \
+  Components: server
+
+; --- Step 6: Show final URLs (visible window so user sees the result) ----------
 Filename: "powershell.exe"; \
   Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\tools\installer-scripts\show-final-url.ps1"" \
     -InstallDir ""{app}"""; \
@@ -185,6 +193,11 @@ Filename: "powershell.exe"; \
 ; Remove firewall rules
 Filename: "powershell.exe"; \
   Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\tools\installer-scripts\configure-firewall.ps1"" -Remove"; \
+  Flags: runhidden waituntilterminated
+
+; Remove startup task
+Filename: "powershell.exe"; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""Unregister-ScheduledTask -TaskName 'ParqueRM_IpCheck' -Confirm:$false -ErrorAction SilentlyContinue"""; \
   Flags: runhidden waituntilterminated
 
 [UninstallDelete]
@@ -277,7 +290,7 @@ begin
   DbPasswordPage := CreateInputQueryPage(ServerIpPage.ID,
     'Contrasena de base de datos',
     'Ingrese la contrasena para SQL Server.',
-    'Esta contrasena se usara para el usuario "sa" de SQL Server. Minimo 8 caracteres.');
+    'Esta contrasena se usara para el usuario "sa" de SQL Server. Minimo 8 caracteres, con mayuscula, minuscula, numero y simbolo.');
   DbPasswordPage.Add('Contrasena:', True);
   DbPasswordPage.Add('Confirmar contrasena:', True);
 
@@ -380,7 +393,7 @@ begin
       Result := False; Exit;
     end;
     if not PasswordLooksSqlStrong(DbPasswordPage.Values[0]) then begin
-      MsgBox('La contrasena debe tener al menos 8 caracteres e incluir mayuscula, minuscula, numero y simbolo. Ejemplo: ParqueRM2026!', mbError, MB_OK);
+      MsgBox('La contrasena SQL debe tener al menos 8 caracteres e incluir mayuscula, minuscula, numero y simbolo. Ejemplo: ParqueRM2026!', mbError, MB_OK);
       Result := False; Exit;
     end;
     if DbPasswordPage.Values[0] <> DbPasswordPage.Values[1] then begin
@@ -461,11 +474,36 @@ end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   rc: Integer;
+  ps: String;
 begin
   Result := '';
   if WizardIsComponentSelected('server') then begin
+    ps :=
+      '$install=''' + ExpandConstant('{app}') + ''';' +
+      '$services=''ParqueRMFrontend'',''ParqueRMBackend'';' +
+      'foreach($svcName in $services){' +
+      '  $svc=Get-Service $svcName -ErrorAction SilentlyContinue;' +
+      '  if($svc -and $svc.Status -ne ''Stopped''){' +
+      '    Stop-Service $svcName -Force -ErrorAction SilentlyContinue' +
+      '  }' +
+      '};' +
+      '$deadline=(Get-Date).AddSeconds(45);' +
+      'do{' +
+      '  $running=@(Get-Service $services -ErrorAction SilentlyContinue | Where-Object { $_.Status -ne ''Stopped'' });' +
+      '  if($running.Count -eq 0){ break }' +
+      '  Start-Sleep -Milliseconds 500' +
+      '} while((Get-Date) -lt $deadline);' +
+      '$prefix=([IO.Path]::GetFullPath($install)).TrimEnd(''\'') + ''\'';' +
+      '$procs=Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {' +
+      '  ($_.Name -in @(''node.exe'',''caddy.exe'',''ParqueRMBackend.exe'',''ParqueRMFrontend.exe'')) -and' +
+      '  (($_.ExecutablePath -and [IO.Path]::GetFullPath($_.ExecutablePath).StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)) -or' +
+      '   ($_.CommandLine -and $_.CommandLine.IndexOf($prefix,[StringComparison]::OrdinalIgnoreCase) -ge 0))' +
+      '};' +
+      'foreach($p in $procs){ Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue };' +
+      'Start-Sleep -Seconds 2';
+
     Exec('powershell.exe',
-      '-NoProfile -ExecutionPolicy Bypass -Command "Stop-Service ParqueRMFrontend,ParqueRMBackend -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 3"',
+      '-NoProfile -ExecutionPolicy Bypass -Command "' + ps + '"',
       '', SW_HIDE, ewWaitUntilTerminated, rc);
   end;
 end;

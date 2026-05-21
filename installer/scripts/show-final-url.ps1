@@ -18,8 +18,13 @@ if (-not (Test-Path $configPath)) {
 }
 
 $cfg = Get-Content $configPath -Raw | ConvertFrom-Json
+$dbReadyPath = Join-Path $InstallDir 'config\db-ready.json'
 
 $errors = New-Object System.Collections.Generic.List[string]
+
+if (-not (Test-Path $dbReadyPath)) {
+    $errors.Add("Base de datos no inicializada correctamente: falta $dbReadyPath")
+}
 
 foreach ($svcName in @('ParqueRMBackend', 'ParqueRMFrontend')) {
     $svc = Get-Service -Name $svcName -ErrorAction SilentlyContinue

@@ -36,9 +36,15 @@ $LogBackend   = Join-Path $InstallDir 'logs\backend'
 $LogFrontend  = Join-Path $InstallDir 'logs\frontend'
 $ConfigDir    = Join-Path $InstallDir 'config'
 $ServicesDir  = Join-Path $InstallDir 'services'
+$DbReadyPath  = Join-Path $ConfigDir 'db-ready.json'
 
 foreach ($d in @($LogBackend, $LogFrontend, $ServicesDir)) {
     if (-not (Test-Path $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
+}
+
+if (-not (Test-Path $DbReadyPath)) {
+    Write-Error "Database initialization did not complete successfully. Missing marker: $DbReadyPath. Check $InstallDir\logs\db-init\ before installing services."
+    exit 1
 }
 
 # --- Locate WinSW -------------------------------------------------------------

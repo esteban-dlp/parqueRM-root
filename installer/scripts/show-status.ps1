@@ -45,7 +45,7 @@ if (Test-Path $configPath) {
 
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor Cyan
-Write-Host "  Estado de ParqueRM" -ForegroundColor Cyan
+Write-Host "  Estado de ParqueRM                                        " -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  Backend  : " -NoNewline -ForegroundColor White
@@ -71,6 +71,69 @@ if ($backendUrl) {
     Write-Host ""
     Write-Host "  Swagger:" -ForegroundColor Yellow
     Write-Host "    $swaggerUrl" -ForegroundColor Cyan
+}
+
+# --- Puertos ------------------------------------------------------------------
+Write-Host ""
+Write-Host "============================================================" -ForegroundColor Cyan
+Write-Host "  Puertos" -ForegroundColor Cyan
+Write-Host "============================================================" -ForegroundColor Cyan
+
+function Test-Port([int]$port) {
+    $result = Test-NetConnection -ComputerName 127.0.0.1 -Port $port -WarningAction SilentlyContinue -InformationLevel Quiet
+    if ($result) { return 'Escuchando', 'Green' } else { return 'Sin respuesta', 'Red' }
+}
+
+$p80status,   $p80color   = Test-Port 80
+$p3000status, $p3000color = Test-Port 3000
+
+Write-Host "  Puerto 80   (Frontend): " -NoNewline -ForegroundColor White
+Write-Host $p80status -ForegroundColor $p80color
+Write-Host "  Puerto 3000 (Backend) : " -NoNewline -ForegroundColor White
+Write-Host $p3000status -ForegroundColor $p3000color
+
+# --- Red / IP -----------------------------------------------------------------
+$currentIps = @(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+    Where-Object { $_.InterfaceAlias -notmatch 'Loopback' -and $_.IPAddress -notlike '169.*' } |
+    Select-Object -ExpandProperty IPAddress)
+
+$configIp = ''
+if (Test-Path $configPath) {
+    try { $configIp = (Get-Content $configPath -Raw | ConvertFrom-Json).serverIp } catch {}
+}
+
+Write-Host ""
+Write-Host "============================================================" -ForegroundColor Cyan
+Write-Host "  Red" -ForegroundColor Cyan
+Write-Host "============================================================" -ForegroundColor Cyan
+Write-Host "  IP guardada en config : " -NoNewline -ForegroundColor White
+if ($configIp) { Write-Host $configIp -ForegroundColor Cyan } else { Write-Host '(no disponible)' -ForegroundColor Gray }
+
+Write-Host "  IP(s) actuales        : " -NoNewline -ForegroundColor White
+if ($currentIps.Count -gt 0) {
+    Write-Host ($currentIps -join ', ') -ForegroundColor Cyan
+} else {
+    Write-Host '(no detectada)' -ForegroundColor Gray
+}
+
+if ($configIp -and $currentIps.Count -gt 0 -and ($currentIps -notcontains $configIp)) {
+    Write-Host ""
+    Write-Host "  [AVISO] La IP cambio desde la instalacion." -ForegroundColor Yellow
+    Write-Host "          Ejecuta: C:\ParqueRM\tools\change-server-ip.bat" -ForegroundColor Yellow
+}
+
+# --- Log del backend ----------------------------------------------------------
+$backendLogDir = Join-Path $InstallDir 'logs\backend'
+$backendLogFile = Get-ChildItem -Path $backendLogDir -Filter '*.log' -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if ($backendLogFile) {
+    Write-Host ""
+    Write-Host "============================================================" -ForegroundColor Cyan
+    Write-Host "  Ultimas 10 lineas del log de Backend" -ForegroundColor Cyan
+    Write-Host "============================================================" -ForegroundColor Cyan
+    Get-Content $backendLogFile.FullName -Tail 10 -ErrorAction SilentlyContinue | ForEach-Object {
+        Write-Host "  $_" -ForegroundColor Gray
+    }
 }
 
 Write-Host ""
