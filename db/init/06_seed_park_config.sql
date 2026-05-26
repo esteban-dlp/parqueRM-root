@@ -24,7 +24,9 @@ BEGIN
         logo_url,
         system_lan_url,
         max_capacity,
-        sidebar_color_hex
+        sidebar_color_hex,
+        ticket_version,
+        ruv
     )
     VALUES (
         'El Refugio del Quetzal',
@@ -38,7 +40,9 @@ BEGIN
         NULL,
         'http://192.168.1.10',
         150,
-        '#1A3A2A'
+        '#1A3A2A',
+        'v1.0',
+        'PENDIENTE'
     );
 END
 GO

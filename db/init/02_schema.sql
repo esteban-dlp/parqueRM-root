@@ -766,5 +766,13 @@ BEGIN
 END
 GO
 
+-- park_config: campos de boleta oficial (v5)
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('park_config') AND name = 'ticket_version')
+    ALTER TABLE park_config ADD ticket_version NVARCHAR(50) NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('park_config') AND name = 'ruv')
+    ALTER TABLE park_config ADD ruv NVARCHAR(80) NULL;
+GO
+
 PRINT '02_schema.sql ejecutado correctamente.';
 GO
