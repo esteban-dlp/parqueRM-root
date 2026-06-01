@@ -26,29 +26,13 @@ if "%DB_PASS%"=="" (
     pause & exit /b 1
 )
 
-:: Read JWT secrets from existing .env using PowerShell (avoids findstr ambiguity)
-echo.
-echo Reading existing JWT secrets from .env...
-for /f "usebackq delims=" %%s in (`powershell.exe -NoProfile -Command "try { $env = Get-Content '%INSTALL_DIR%\app\backend\.env' -ErrorAction Stop; ($env | Where-Object { $_ -match '^JWT_SECRET=' } | Select-Object -First 1) -replace '^JWT_SECRET=','' } catch { '' }"`) do set JWT_SECRET=%%s
-for /f "usebackq delims=" %%s in (`powershell.exe -NoProfile -Command "try { $env = Get-Content '%INSTALL_DIR%\app\backend\.env' -ErrorAction Stop; ($env | Where-Object { $_ -match '^JWT_REFRESH_SECRET=' } | Select-Object -First 1) -replace '^JWT_REFRESH_SECRET=','' } catch { '' }"`) do set JWT_REFRESH=%%s
-
-if "%JWT_SECRET%"=="" (
-    echo [WARN] Could not read JWT_SECRET from .env. You must enter it manually.
-    set /p JWT_SECRET=Enter JWT Secret:
-)
-if "%JWT_REFRESH%"=="" (
-    echo [WARN] Could not read JWT_REFRESH_SECRET from .env. You must enter it manually.
-    set /p JWT_REFRESH=Enter JWT Refresh Secret:
-)
-
 echo.
 echo Updating configuration for IP: %NEW_IP%
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0installer-scripts\generate-config.ps1" ^
     -InstallDir "%INSTALL_DIR%" ^
     -ServerIp "%NEW_IP%" ^
     -DbPassword "%DB_PASS%" ^
-    -JwtSecret "%JWT_SECRET%" ^
-    -JwtRefreshSecret "%JWT_REFRESH%"
+    -PreserveExistingSecrets
 
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Configuration update failed.

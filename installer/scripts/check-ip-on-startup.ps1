@@ -87,6 +87,9 @@ if (-not (Test-Path $configPath)) {
                         -ServerIp $currentIp `
                         -DbPassword $dbPassword `
                         -PreserveExistingSecrets
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "generate-config.ps1 failed with exit code $LASTEXITCODE"
+                    }
                     Write-Log "Configuracion actualizada para IP $currentIp."
                 } catch {
                     Write-Log "Error actualizando config: $_" 'ERROR'
@@ -115,7 +118,7 @@ foreach ($svcName in @('ParqueRMBackend', 'ParqueRMFrontend')) {
                 Write-Log "Servicio $svcName no respondio al inicio. Estado: $($svc.Status)" 'ERROR'
             }
         } catch {
-            Write-Log "Error iniciando $svcName: $_" 'ERROR'
+            Write-Log "Error iniciando ${svcName}: $_" 'ERROR'
         }
     } else {
         Write-Log "Servicio $svcName corriendo OK."

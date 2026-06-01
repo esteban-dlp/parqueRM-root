@@ -111,6 +111,55 @@ $BackendUrl  = "$FrontendUrl/api"
 $SwaggerUrl  = "$FrontendUrl/api/docs"
 $FrontendApiUrl = '/api'
 
+function ConvertTo-SqlLiteral([string]$Value) {
+    return "N'$($Value.Replace("'", "''"))'"
+}
+
+function Find-Sqlcmd {
+    $sqlcmdCmd = Get-Command sqlcmd -ErrorAction SilentlyContinue
+    if ($sqlcmdCmd) { return $sqlcmdCmd.Source }
+
+    $candidates = @(
+        (Join-Path $InstallDir 'runtime\sqlcmd\sqlcmd.exe'),
+        'C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\170\Tools\Binn\sqlcmd.exe',
+        'C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\160\Tools\Binn\sqlcmd.exe',
+        'C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\130\Tools\Binn\sqlcmd.exe'
+    )
+
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) { return $candidate }
+    }
+
+    return ''
+}
+
+function Update-ParkConfigSystemLanUrl([string]$SystemLanUrl) {
+    $sqlcmd = Find-Sqlcmd
+    if ([string]::IsNullOrWhiteSpace($sqlcmd)) {
+        Write-Warning "sqlcmd.exe not found; park_config.system_lan_url was not updated."
+        return
+    }
+
+    $urlLiteral = ConvertTo-SqlLiteral $SystemLanUrl
+    $updateSql = @"
+IF OBJECT_ID(N'dbo.park_config', N'U') IS NOT NULL
+BEGIN
+    UPDATE dbo.park_config
+    SET system_lan_url = $urlLiteral,
+        updated_at = SYSDATETIME();
+END
+"@
+
+    $output = & $sqlcmd '-S' '127.0.0.1,1433' '-U' $DbUser '-P' $DbPassword '-d' $DbName '-Q' $updateSql '-b' 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        if ($output) { $output | ForEach-Object { Write-Warning $_ } }
+        Write-Error "Failed to update park_config.system_lan_url."
+        exit 1
+    }
+
+    Write-Host "  [OK] park_config.system_lan_url -> $SystemLanUrl" -ForegroundColor Green
+}
+
 # --- Backend .env -------------------------------------------------------------
 $envContent = @"
 NODE_ENV=production
@@ -160,6 +209,9 @@ $centralConfig = [ordered]@{
 $centralConfigPath = Join-Path $ConfigDir 'parquerm.config.json'
 $centralConfig | Out-File -FilePath $centralConfigPath -Encoding utf8 -NoNewline
 Write-Host "  [OK] Central config -> $centralConfigPath" -ForegroundColor Green
+
+# Keep the URL shown in Configuracion del parque aligned with the detected server IP.
+Update-ParkConfigSystemLanUrl $FrontendUrl
 
 Write-Host ""
 Write-Host "Configuration generated successfully." -ForegroundColor Cyan

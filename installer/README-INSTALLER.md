@@ -86,6 +86,7 @@ The installer writes:
 - `C:\ParqueRM\app\backend\.env`
 - `C:\ParqueRM\app\frontend\dist\config.json`
 - `C:\ParqueRM\config\parquerm.config.json`
+- `park_config.system_lan_url` in SQL Server, using the detected server URL.
 
 The frontend runtime config points to the same origin:
 

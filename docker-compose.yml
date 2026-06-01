@@ -13,10 +13,7 @@ services:
     networks:
       - parqueRM-net
     restart: unless-stopped
-    # Healthcheck: SQL Server 2022 expone sqlcmd en /opt/mssql-tools18/bin.
-    # $$MSSQL_SA_PASSWORD: el $$ le dice a Compose que NO sustituya — el shell
-    # del contenedor expande $MSSQL_SA_PASSWORD desde su propio environment.
-    # start_period: le da 30 s a SQL Server para arrancar antes de contar fallos.
+    # SQL Server 2022 exposes sqlcmd in /opt/mssql-tools18/bin.
     healthcheck:
       test: ["CMD-SHELL", "SQLCMDPASSWORD=$$MSSQL_SA_PASSWORD /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -Q 'SELECT 1' -b -No"]
       interval: 10s
@@ -29,23 +26,26 @@ services:
     container_name: parqueRM-db-init
     depends_on:
       sqlserver:
-        condition: service_healthy   # espera al healthcheck de SQL Server
+        condition: service_healthy
     volumes:
       - ./db/init:/scripts
     environment:
       SQLSERVER_SA_PASSWORD: "${SQLSERVER_SA_PASSWORD}"
-    # Sin sleep: sqlserver ya pasó su healthcheck cuando llegamos aquí.
+      SYSTEM_LAN_URL: "${SYSTEM_LAN_URL:-http://192.168.1.10}"
     command: >
       /bin/bash -c "
-      echo 'SQL Server listo — ejecutando scripts de inicialización...' &&
-      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"${SQLSERVER_SA_PASSWORD}\" -i /scripts/01_create_database.sql &&
-      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"${SQLSERVER_SA_PASSWORD}\" -d ParqueRM -i /scripts/02_schema.sql &&
-      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"${SQLSERVER_SA_PASSWORD}\" -d ParqueRM -i /scripts/03_seed_security.sql &&
-      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"${SQLSERVER_SA_PASSWORD}\" -d ParqueRM -i /scripts/04_seed_catalogs.sql &&
-      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"${SQLSERVER_SA_PASSWORD}\" -d ParqueRM -i /scripts/05_seed_tariffs.sql &&
-      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"${SQLSERVER_SA_PASSWORD}\" -d ParqueRM -i /scripts/06_seed_park_config.sql &&
-      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"${SQLSERVER_SA_PASSWORD}\" -d ParqueRM -i /scripts/07_seed_demo_data.sql &&
-      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"${SQLSERVER_SA_PASSWORD}\" -d ParqueRM -i /scripts/08_patch_park_config_sidebar_color_hex.sql &&
+      SYSTEM_LAN_URL_ESCAPED=$$(printf '%s' \"$$SYSTEM_LAN_URL\" | sed \"s/'/''/g\") &&
+      echo 'SQL Server listo - ejecutando scripts de inicializacion...' &&
+      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SQLSERVER_SA_PASSWORD\" -i /scripts/01_create_database.sql &&
+      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SQLSERVER_SA_PASSWORD\" -d ParqueRM -i /scripts/02_schema.sql &&
+      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SQLSERVER_SA_PASSWORD\" -d ParqueRM -i /scripts/03_seed_security.sql &&
+      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SQLSERVER_SA_PASSWORD\" -d ParqueRM -i /scripts/04_seed_catalogs.sql &&
+      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SQLSERVER_SA_PASSWORD\" -d ParqueRM -i /scripts/05_seed_tariffs.sql &&
+      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SQLSERVER_SA_PASSWORD\" -d ParqueRM -i /scripts/06_seed_park_config.sql &&
+      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SQLSERVER_SA_PASSWORD\" -d ParqueRM -i /scripts/07_seed_demo_data.sql &&
+      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SQLSERVER_SA_PASSWORD\" -d ParqueRM -i /scripts/08_patch_park_config_sidebar_color_hex.sql &&
+      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SQLSERVER_SA_PASSWORD\" -d ParqueRM -i /scripts/09_patch_tickets_and_services.sql &&
+      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SQLSERVER_SA_PASSWORD\" -d ParqueRM -Q \"UPDATE dbo.park_config SET system_lan_url = N'$$SYSTEM_LAN_URL_ESCAPED', updated_at = SYSDATETIME();\" &&
       echo 'Base de datos inicializada correctamente.'
       "
     networks:
@@ -77,9 +77,9 @@ services:
       - uploads_data:/app/uploads
     depends_on:
       sqlserver:
-        condition: service_healthy              # SQL Server acepta conexiones
+        condition: service_healthy
       db-init:
-        condition: service_completed_successfully  # scripts corrieron sin error
+        condition: service_completed_successfully
     networks:
       - parqueRM-net
     restart: unless-stopped

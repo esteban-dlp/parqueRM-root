@@ -38,6 +38,7 @@ BEGIN
         '+502 0000-0000',
         'info@parque.local',
         NULL,
+        -- Fallback. Installer and Docker overwrite this with the detected server URL.
         'http://192.168.1.10',
         150,
         '#1A3A2A',
