@@ -1,6 +1,13 @@
 @echo off
 setlocal enabledelayedexpansion
 
+net session >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    echo Requesting administrator permission...
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+    exit /b
+)
+
 set INSTALL_DIR=C:\ParqueRM
 
 :: Detect sqlcmd

@@ -136,5 +136,18 @@ if ($backendLogFile) {
     }
 }
 
+$frontendLogDir = Join-Path $InstallDir 'logs\frontend'
+$frontendLogFile = Get-ChildItem -Path $frontendLogDir -Filter '*.log' -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if ($frontendLogFile) {
+    Write-Host ""
+    Write-Host "============================================================" -ForegroundColor Cyan
+    Write-Host "  Ultimas 10 lineas del log de Frontend" -ForegroundColor Cyan
+    Write-Host "============================================================" -ForegroundColor Cyan
+    Get-Content $frontendLogFile.FullName -Tail 10 -ErrorAction SilentlyContinue | ForEach-Object {
+        Write-Host "  $_" -ForegroundColor Gray
+    }
+}
+
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor Cyan

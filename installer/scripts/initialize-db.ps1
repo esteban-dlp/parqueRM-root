@@ -45,6 +45,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$ExitCodeSqlPasswordRetry = 11
 
 $ScriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
 
@@ -104,8 +105,10 @@ if ([string]::IsNullOrWhiteSpace($DbPassword)) {
 }
 
 function New-BcryptHash([string]$PlainTextPassword) {
-    $defaultAdminHash = '$2b$12$.JFcotaaZqS6E/XbFow1Xuq0CdQVbEYRItqhm/FDI6cNVuTdmuX3e'
-    if ([string]::IsNullOrWhiteSpace($PlainTextPassword)) { return $defaultAdminHash }
+    if ([string]::IsNullOrWhiteSpace($PlainTextPassword)) {
+        Write-Log "ERROR: AdminPassword is required; refusing to keep the seed/default admin password." 'Red'
+        exit 1
+    }
 
     $nodePath = Join-Path $RuntimeCacheDir 'node\node.exe'
     if (-not (Test-Path $nodePath)) {
@@ -146,6 +149,45 @@ function Write-Log([string]$msg, [string]$color = 'White') {
 
 function ConvertTo-SqlLiteral([string]$Value) {
     return "N'$($Value.Replace("'", "''"))'"
+}
+
+function ConvertTo-WindowsCommandLineArgument([string]$Value) {
+    if ($null -eq $Value) { return '""' }
+
+    $needsQuotes = ($Value.Length -eq 0 -or $Value -match '[\s"]')
+    if (-not $needsQuotes) { return $Value }
+
+    $result = '"'
+    $backslashes = 0
+    foreach ($ch in $Value.ToCharArray()) {
+        if ($ch -eq '\') {
+            $backslashes++
+            continue
+        }
+
+        if ($ch -eq '"') {
+            $result += ('\' * (($backslashes * 2) + 1))
+            $result += '"'
+            $backslashes = 0
+            continue
+        }
+
+        if ($backslashes -gt 0) {
+            $result += ('\' * $backslashes)
+            $backslashes = 0
+        }
+        $result += $ch
+    }
+
+    if ($backslashes -gt 0) {
+        $result += ('\' * ($backslashes * 2))
+    }
+    $result += '"'
+    return $result
+}
+
+function Join-WindowsCommandLine([string[]]$Arguments) {
+    return (($Arguments | ForEach-Object { ConvertTo-WindowsCommandLineArgument $_ }) -join ' ')
 }
 
 function Get-SqlEngineServices {
@@ -283,9 +325,21 @@ ALTER LOGIN [sa] WITH PASSWORD=$passwordLiteral UNLOCK;
         if ($output) {
             $output | Select-Object -Last 8 | ForEach-Object { Write-Log "  $_" 'Red' }
         }
-        exit 1
+        exit $ExitCodeSqlPasswordRetry
     }
     return $true
+}
+
+trap {
+    try {
+        Write-Log "UNHANDLED ERROR: $($_.Exception.Message)" 'Red'
+        if ($_.ScriptStackTrace) {
+            Write-Log "STACK: $($_.ScriptStackTrace)" 'Red'
+        }
+    } catch {
+        Write-Host "UNHANDLED ERROR: $($_.Exception.Message)" -ForegroundColor Red
+    }
+    exit 1
 }
 
 # --- Locate sqlcmd ------------------------------------------------------------
@@ -304,7 +358,7 @@ if (-not $sqlcmd) {
 Write-Log "=== Step 1: SQL Server Express ===" 'Cyan'
 
 $sqlServerInstalled = $false
-$engineServices = Get-SqlEngineServices
+$engineServices = @(Get-SqlEngineServices)
 if ($engineServices.Count -gt 0) {
     $sqlServerInstalled = $true
     Write-Log "SQL Server already installed: $($engineServices.Name -join ', ')" 'Green'
@@ -325,11 +379,22 @@ if (-not $sqlServerInstalled -and -not $skipSqlInstallFlag) {
     }
 
     Write-Log "Installing SQL Server Express from $($sqlSetup.FullName) ..." 'Yellow'
-    $sqlArgs = "/Q /ACTION=Install /FEATURES=SQLEngine /INSTANCENAME=MSSQLSERVER /SECURITYMODE=SQL /SAPWD=`"$DbPassword`" /TCPENABLED=1 /IACCEPTSQLSERVERLICENSETERMS"
+    $sqlSetupArgs = @(
+        '/Q',
+        '/ACTION=Install',
+        '/FEATURES=SQLEngine',
+        '/INSTANCENAME=MSSQLSERVER',
+        '/SECURITYMODE=SQL',
+        "/SAPWD=$DbPassword",
+        '/TCPENABLED=1',
+        '/IACCEPTSQLSERVERLICENSETERMS'
+    )
+    $sqlArgs = Join-WindowsCommandLine $sqlSetupArgs
     $proc = Start-Process -FilePath $sqlSetup.FullName -ArgumentList $sqlArgs -Wait -PassThru
     if ($proc.ExitCode -ne 0 -and $proc.ExitCode -ne 3010) {
         Write-Log "SQL Server installation failed (exit code $($proc.ExitCode))." 'Red'
-        exit 1
+        Write-Log "This can happen when SQL Server rejects the provided 'sa' password. The installer should ask for a different SQL password and retry." 'Yellow'
+        exit $ExitCodeSqlPasswordRetry
     }
     Write-Log "SQL Server Express installed successfully." 'Green'
     if ($proc.ExitCode -eq 3010) {
@@ -339,7 +404,7 @@ if (-not $sqlServerInstalled -and -not $skipSqlInstallFlag) {
 
 # --- Step 2: Ensure SQL Server service is running -----------------------------
 Write-Log "=== Step 2: SQL Server service ===" 'Cyan'
-$engineServices = Get-SqlEngineServices
+$engineServices = @(Get-SqlEngineServices)
 $svc = $engineServices | Select-Object -First 1
 if (-not $svc) {
     Write-Log "ERROR: Could not find SQL Server service. Check installation." 'Red'
@@ -384,7 +449,7 @@ if (-not (Test-SaLogin $sqlArgs)) {
     Restart-SqlServiceAndWait $sqlServiceName
     if (-not (Test-SaLogin $sqlArgs)) {
         Write-Log "ERROR: SQL 'sa' login still failed after repair attempt." 'Red'
-        exit 1
+        exit $ExitCodeSqlPasswordRetry
     }
 }
 Write-Log "SQL 'sa' login verified." 'Green'

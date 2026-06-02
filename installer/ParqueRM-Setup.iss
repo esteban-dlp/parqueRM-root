@@ -113,6 +113,7 @@ Name: "{group}\Detener servicios";       Filename: "{app}\tools\stop-services.ba
 Name: "{group}\Crear backup";            Filename: "{app}\tools\backup-db.bat";           Components: server
 Name: "{group}\Restaurar backup";        Filename: "{app}\tools\restore-db.bat";          Components: server
 Name: "{group}\Cambiar IP del servidor"; Filename: "{app}\tools\change-server-ip.bat";    Components: server
+Name: "{group}\Diagnostico ParqueRM";     Filename: "{app}\tools\collect-diagnostics.bat"; Components: server
 
 ; --- Desktop shortcut (server) --------------------------------------------------
 Name: "{userdesktop}\ParqueRM";          Filename: "{app}\tools\open-parquerm.bat"; \
@@ -122,66 +123,6 @@ Name: "{userdesktop}\ParqueRM";          Filename: "{app}\tools\open-parquerm.ba
 Name: "{group}\Abrir ParqueRM";          Filename: "{app}\open-parquerm-client.url";      Components: clientonly
 Name: "{userdesktop}\ParqueRM";          Filename: "{app}\open-parquerm-client.url"; \
   Components: clientonly; Tasks: desktopicon
-
-[Run]
-; --- Step 1: Configure firewall (open ports 80 and 3000) -----------------------
-Filename: "powershell.exe"; \
-  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\tools\installer-scripts\configure-firewall.ps1"""; \
-  Flags: runhidden waituntilterminated; \
-  StatusMsg: "Configurando firewall..."; \
-  Components: server
-
-; --- Step 2: Initialize SQL Server and database --------------------------------
-Filename: "powershell.exe"; \
-  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\tools\installer-scripts\initialize-db.ps1"" \
-    -InstallDir ""{app}"" \
-    -RuntimeCacheDir ""{app}\runtime"" \
-    -DbPassword ""{code:GetDbPassword}"" \
-    -AdminPassword ""{code:GetAdminPassword}"" \
-    -InitScriptsDir ""{app}\app\database\init"" \
-    -MigrationsDir ""{app}\app\database\migrations"" \
-    -SkipSqlServerInstall:{code:SkipSqlInstall}"; \
-  Flags: runhidden waituntilterminated; \
-  StatusMsg: "Inicializando base de datos..."; \
-  Components: server
-
-; --- Step 3: Generate configuration files (backend .env, frontend config.json) -
-Filename: "powershell.exe"; \
-  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\tools\installer-scripts\generate-config.ps1"" \
-    -InstallDir ""{app}"" \
-    -ServerIp ""{code:GetServerIp}"" \
-    -DbPassword ""{code:GetDbPassword}"" \
-    -JwtSecret ""{code:GetJwtSecret}"" \
-    -JwtRefreshSecret ""{code:GetJwtRefreshSecret}"" \
-    -PreserveExistingSecrets"; \
-  Flags: runhidden waituntilterminated; \
-  StatusMsg: "Generando configuracion..."; \
-  Components: server
-
-; --- Step 4: Install Windows services (backend + frontend) ---------------------
-Filename: "powershell.exe"; \
-  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\tools\installer-scripts\install-services.ps1"" \
-    -InstallDir ""{app}"" \
-    -RuntimeDir ""{app}\runtime"""; \
-  Flags: runhidden waituntilterminated; \
-  StatusMsg: "Instalando servicios de Windows..."; \
-  Components: server
-
-; --- Step 5: Register startup task (auto-IP-update on reboot) -----------------
-Filename: "powershell.exe"; \
-  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\tools\installer-scripts\register-startup-task.ps1"" \
-    -InstallDir ""{app}"""; \
-  Flags: runhidden waituntilterminated; \
-  StatusMsg: "Registrando tarea de inicio automatico..."; \
-  Components: server
-
-; --- Step 6: Show final URLs (visible window so user sees the result) ----------
-Filename: "powershell.exe"; \
-  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\tools\installer-scripts\show-final-url.ps1"" \
-    -InstallDir ""{app}"""; \
-  Flags: shellexec waituntilterminated; \
-  StatusMsg: "Instalacion completada."; \
-  Components: server
 
 [UninstallRun]
 ; Stop and remove Windows services first
@@ -290,7 +231,7 @@ begin
   DbPasswordPage := CreateInputQueryPage(ServerIpPage.ID,
     'Contrasena de base de datos',
     'Ingrese la contrasena para SQL Server.',
-    'Esta contrasena se usara para el usuario "sa" de SQL Server. Minimo 8 caracteres, con mayuscula, minuscula, numero y simbolo.');
+    'Si SQL Server ya existe, ingrese la contrasena actual de "sa". Si no existe, esta sera la contrasena que se intentara configurar.');
   DbPasswordPage.Add('Contrasena:', True);
   DbPasswordPage.Add('Confirmar contrasena:', True);
 
@@ -346,23 +287,6 @@ begin
   Result := dots = 3;
 end;
 
-function PasswordLooksSqlStrong(Value: String): Boolean;
-var
-  i: Integer;
-  ch: String;
-  hasUpper, hasLower, hasDigit, hasSymbol: Boolean;
-begin
-  hasUpper := False; hasLower := False; hasDigit := False; hasSymbol := False;
-  for i := 1 to Length(Value) do begin
-    ch := Copy(Value, i, 1);
-    if Pos(ch, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') > 0 then hasUpper := True
-    else if Pos(ch, 'abcdefghijklmnopqrstuvwxyz') > 0 then hasLower := True
-    else if Pos(ch, '0123456789') > 0 then hasDigit := True
-    else hasSymbol := True;
-  end;
-  Result := (Length(Value) >= 8) and hasUpper and hasLower and hasDigit and hasSymbol;
-end;
-
 function NextButtonClick(CurPageID: Integer): Boolean;
 begin
   Result := True;
@@ -386,14 +310,6 @@ begin
   if CurPageID = DbPasswordPage.ID then begin
     if DbPasswordPage.Values[0] = '' then begin
       MsgBox('La contrasena no puede estar vacia.', mbError, MB_OK);
-      Result := False; Exit;
-    end;
-    if Pos('"', DbPasswordPage.Values[0]) > 0 then begin
-      MsgBox('La contrasena SQL no puede contener comillas dobles.', mbError, MB_OK);
-      Result := False; Exit;
-    end;
-    if not PasswordLooksSqlStrong(DbPasswordPage.Values[0]) then begin
-      MsgBox('La contrasena SQL debe tener al menos 8 caracteres e incluir mayuscula, minuscula, numero y simbolo. Ejemplo: ParqueRM2026!', mbError, MB_OK);
       Result := False; Exit;
     end;
     if DbPasswordPage.Values[0] <> DbPasswordPage.Values[1] then begin
@@ -439,6 +355,22 @@ end;
 
 { ===== Code callbacks used by [Run] section ===== }
 
+function PowerShellSingleQuoted(Value: String): String;
+var
+  i: Integer;
+  ch: String;
+begin
+  Result := #39;
+  for i := 1 to Length(Value) do begin
+    ch := Copy(Value, i, 1);
+    if ch = #39 then
+      Result := Result + #39 + #39
+    else
+      Result := Result + ch;
+  end;
+  Result := Result + #39;
+end;
+
 function GetServerIp(Param: String): String;
 begin
   Result := GServerIp;
@@ -449,9 +381,19 @@ begin
   Result := GDbPassword;
 end;
 
+function GetDbPasswordPs(Param: String): String;
+begin
+  Result := PowerShellSingleQuoted(GDbPassword);
+end;
+
 function GetAdminPassword(Param: String): String;
 begin
   Result := GAdminPassword;
+end;
+
+function GetAdminPasswordPs(Param: String): String;
+begin
+  Result := PowerShellSingleQuoted(GAdminPassword);
 end;
 
 function GetJwtSecret(Param: String): String;
@@ -459,9 +401,19 @@ begin
   Result := GJwtSecret;
 end;
 
+function GetJwtSecretPs(Param: String): String;
+begin
+  Result := PowerShellSingleQuoted(GJwtSecret);
+end;
+
 function GetJwtRefreshSecret(Param: String): String;
 begin
   Result := GJwtRefreshSecret;
+end;
+
+function GetJwtRefreshSecretPs(Param: String): String;
+begin
+  Result := PowerShellSingleQuoted(GJwtRefreshSecret);
 end;
 
 function SkipSqlInstall(Param: String): String;
@@ -469,6 +421,239 @@ begin
   { Always attempt SQL Server install unless already present.
     initialize-db.ps1 checks if SQL Server is already installed. }
   Result := 'false';
+end;
+
+function PromptSqlPasswordRetry(var NewPassword: String): Boolean;
+var
+  form: TSetupForm;
+  infoLabel: TNewStaticText;
+  passwordLabel: TNewStaticText;
+  confirmLabel: TNewStaticText;
+  passwordEdit: TPasswordEdit;
+  confirmEdit: TPasswordEdit;
+  okButton: TNewButton;
+  cancelButton: TNewButton;
+begin
+  Result := False;
+
+  while True do begin
+    form := CreateCustomForm(ScaleX(430), ScaleY(220), False, True);
+    try
+      form.Caption := 'Contrasena SQL Server';
+
+      infoLabel := TNewStaticText.Create(form);
+      infoLabel.Parent := form;
+      infoLabel.Left := ScaleX(12);
+      infoLabel.Top := ScaleY(12);
+      infoLabel.Width := ScaleX(405);
+      infoLabel.Height := ScaleY(55);
+      infoLabel.WordWrap := True;
+      infoLabel.Caption :=
+        'La contrasena SQL ingresada no funciono o SQL Server la rechazo. ' +
+        'Ingrese la contrasena actual del usuario "sa" si SQL Server ya existe, ' +
+        'o una nueva contrasena para instalar SQL Server.';
+
+      passwordLabel := TNewStaticText.Create(form);
+      passwordLabel.Parent := form;
+      passwordLabel.Left := ScaleX(12);
+      passwordLabel.Top := ScaleY(82);
+      passwordLabel.Caption := 'Contrasena de sa:';
+
+      passwordEdit := TPasswordEdit.Create(form);
+      passwordEdit.Parent := form;
+      passwordEdit.Left := ScaleX(12);
+      passwordEdit.Top := ScaleY(100);
+      passwordEdit.Width := ScaleX(405);
+
+      confirmLabel := TNewStaticText.Create(form);
+      confirmLabel.Parent := form;
+      confirmLabel.Left := ScaleX(12);
+      confirmLabel.Top := ScaleY(132);
+      confirmLabel.Caption := 'Confirmar contrasena:';
+
+      confirmEdit := TPasswordEdit.Create(form);
+      confirmEdit.Parent := form;
+      confirmEdit.Left := ScaleX(12);
+      confirmEdit.Top := ScaleY(150);
+      confirmEdit.Width := ScaleX(405);
+
+      okButton := TNewButton.Create(form);
+      okButton.Parent := form;
+      okButton.Caption := 'Reintentar';
+      okButton.Left := ScaleX(217);
+      okButton.Top := ScaleY(188);
+      okButton.Width := ScaleX(95);
+      okButton.ModalResult := mrOk;
+      okButton.Default := True;
+
+      cancelButton := TNewButton.Create(form);
+      cancelButton.Parent := form;
+      cancelButton.Caption := 'Cancelar';
+      cancelButton.Left := ScaleX(322);
+      cancelButton.Top := ScaleY(188);
+      cancelButton.Width := ScaleX(95);
+      cancelButton.ModalResult := mrCancel;
+      cancelButton.Cancel := True;
+
+      form.ActiveControl := passwordEdit;
+      form.FlipAndCenterIfNeeded(True, WizardForm, False);
+
+      if form.ShowModal() <> mrOk then begin
+        Result := False;
+        Exit;
+      end;
+
+      if passwordEdit.Text = '' then begin
+        MsgBox('La contrasena SQL no puede estar vacia.', mbError, MB_OK);
+        Continue;
+      end;
+
+      if passwordEdit.Text <> confirmEdit.Text then begin
+        MsgBox('Las contrasenas SQL no coinciden.', mbError, MB_OK);
+        Continue;
+      end;
+
+      NewPassword := passwordEdit.Text;
+      Result := True;
+      Exit;
+    finally
+      form.Free();
+    end;
+  end;
+end;
+
+function RunPowerShellStepRaw(StepName, ScriptPath, Args: String; ShowWindow: Boolean): Integer;
+var
+  rc: Integer;
+  params: String;
+  showCmd: Integer;
+begin
+  WizardForm.StatusLabel.Caption := StepName;
+
+  params := '-NoProfile -ExecutionPolicy Bypass -File "' + ScriptPath + '" ' + Args;
+  if ShowWindow then
+    showCmd := SW_SHOW
+  else
+    showCmd := SW_HIDE;
+
+  if not Exec('powershell.exe', params, '', showCmd, ewWaitUntilTerminated, rc) then
+    Result := -1
+  else
+    Result := rc;
+end;
+
+procedure RunPowerShellStep(StepName, ScriptPath, Args: String; ShowWindow: Boolean);
+var
+  rc: Integer;
+begin
+  rc := RunPowerShellStepRaw(StepName, ScriptPath, Args, ShowWindow);
+  if rc = -1 then begin
+    MsgBox('No se pudo ejecutar el paso: ' + StepName + #13#10 +
+      'Revise permisos de administrador y archivos de instalacion.', mbError, MB_OK);
+    RaiseException('ParqueRM install step could not start: ' + StepName);
+  end;
+  if rc <> 0 then begin
+    MsgBox('La instalacion de ParqueRM no pudo completar el paso:' + #13#10 +
+      StepName + #13#10#13#10 +
+      'Codigo de salida: ' + IntToStr(rc) + #13#10#13#10 +
+      'Revise los logs en ' + ExpandConstant('{app}\logs') + ' antes de entregar el equipo.', mbError, MB_OK);
+    RaiseException('ParqueRM install step failed: ' + StepName);
+  end;
+end;
+
+function InitializeDbArgs(appDir: String): String;
+begin
+  Result :=
+    '-InstallDir "' + appDir + '" ' +
+    '-RuntimeCacheDir "' + appDir + '\runtime" ' +
+    '-DbPassword ' + PowerShellSingleQuoted(GDbPassword) + ' ' +
+    '-AdminPassword ' + PowerShellSingleQuoted(GAdminPassword) + ' ' +
+    '-InitScriptsDir "' + appDir + '\app\database\init" ' +
+    '-MigrationsDir "' + appDir + '\app\database\migrations" ' +
+    '-SkipSqlServerInstall:' + SkipSqlInstall('');
+end;
+
+procedure RunInitializeDbWithRetry(appDir, scriptsDir: String);
+var
+  rc: Integer;
+  retryPassword: String;
+begin
+  while True do begin
+    rc := RunPowerShellStepRaw(
+      'Inicializando base de datos...',
+      scriptsDir + '\initialize-db.ps1',
+      InitializeDbArgs(appDir),
+      False);
+
+    if rc = 0 then
+      Exit;
+
+    if rc = 11 then begin
+      if PromptSqlPasswordRetry(retryPassword) then begin
+        GDbPassword := retryPassword;
+        Continue;
+      end;
+
+      RaiseException('ParqueRM SQL password retry cancelled.');
+    end;
+
+    if rc = -1 then begin
+      MsgBox('No se pudo ejecutar el paso: Inicializando base de datos...' + #13#10 +
+        'Revise permisos de administrador y archivos de instalacion.', mbError, MB_OK);
+    end else begin
+      MsgBox('La instalacion de ParqueRM no pudo completar el paso:' + #13#10 +
+        'Inicializando base de datos...' + #13#10#13#10 +
+        'Codigo de salida: ' + IntToStr(rc) + #13#10#13#10 +
+        'Revise los logs en ' + ExpandConstant('{app}\logs') + ' antes de entregar el equipo.', mbError, MB_OK);
+    end;
+    RaiseException('ParqueRM install step failed: Inicializando base de datos...');
+  end;
+end;
+
+procedure RunServerPostInstall;
+var
+  appDir: String;
+  scriptsDir: String;
+begin
+  appDir := ExpandConstant('{app}');
+  scriptsDir := appDir + '\tools\installer-scripts';
+
+  RunPowerShellStep(
+    'Configurando firewall...',
+    scriptsDir + '\configure-firewall.ps1',
+    '',
+    False);
+
+  RunInitializeDbWithRetry(appDir, scriptsDir);
+
+  RunPowerShellStep(
+    'Generando configuracion...',
+    scriptsDir + '\generate-config.ps1',
+    '-InstallDir "' + appDir + '" ' +
+    '-ServerIp "' + GServerIp + '" ' +
+    '-DbPassword ' + PowerShellSingleQuoted(GDbPassword) + ' ' +
+    '-JwtSecret ' + PowerShellSingleQuoted(GJwtSecret) + ' ' +
+    '-JwtRefreshSecret ' + PowerShellSingleQuoted(GJwtRefreshSecret) + ' ' +
+    '-PreserveExistingSecrets',
+    False);
+
+  RunPowerShellStep(
+    'Instalando servicios de Windows...',
+    scriptsDir + '\install-services.ps1',
+    '-InstallDir "' + appDir + '" -RuntimeDir "' + appDir + '\runtime"',
+    False);
+
+  RunPowerShellStep(
+    'Registrando tarea de inicio automatico...',
+    scriptsDir + '\register-startup-task.ps1',
+    '-InstallDir "' + appDir + '"',
+    False);
+
+  RunPowerShellStep(
+    'Validando instalacion...',
+    scriptsDir + '\show-final-url.ps1',
+    '-InstallDir "' + appDir + '"',
+    True);
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
@@ -515,6 +700,10 @@ var
   urlContent: String;
 begin
   if CurStep = ssPostInstall then begin
+    if WizardIsComponentSelected('server') then begin
+      RunServerPostInstall;
+    end;
+
     if WizardIsComponentSelected('clientonly') then begin
       urlFile    := ExpandConstant('{app}\open-parquerm-client.url');
       urlContent := '[InternetShortcut]' + #13#10 +
