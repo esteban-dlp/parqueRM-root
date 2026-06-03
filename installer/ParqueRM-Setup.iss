@@ -163,6 +163,7 @@ var
   GJwtSecret:         String;
   GJwtRefreshSecret:  String;
   GExistingInstall:   Boolean;
+  GInstallFailed:     Boolean;
 
 function DetectLanIp: String;
 var
@@ -209,6 +210,7 @@ end;
 procedure InitializeWizard;
 begin
   GExistingInstall := FileExists(ExpandConstant('{#DefaultDir}\app\backend\.env'));
+  GInstallFailed := False;
   GServerIp := DetectLanIp;
 
   { Server IP page -- shown only in server mode }
@@ -423,6 +425,50 @@ begin
   Result := 'false';
 end;
 
+procedure OpenDiagnosticsFolder(appDir: String);
+var
+  rc: Integer;
+  scriptsDir: String;
+  diagnosticsDir: String;
+begin
+  scriptsDir := appDir + '\tools\installer-scripts';
+  diagnosticsDir := appDir + '\diagnostics';
+
+  if FileExists(scriptsDir + '\collect-diagnostics.ps1') then begin
+    Exec('powershell.exe',
+      '-NoProfile -ExecutionPolicy Bypass -File "' + scriptsDir + '\collect-diagnostics.ps1" -InstallDir "' + appDir + '"',
+      '', SW_HIDE, ewWaitUntilTerminated, rc);
+  end;
+
+  if DirExists(diagnosticsDir) then begin
+    ShellExec('open', diagnosticsDir, '', '', SW_SHOWNORMAL, ewNoWait, rc);
+  end else if DirExists(appDir + '\logs') then begin
+    ShellExec('open', appDir + '\logs', '', '', SW_SHOWNORMAL, ewNoWait, rc);
+  end;
+end;
+
+procedure FailInstall(StepName: String; ExitCode: Integer);
+var
+  msg: String;
+begin
+  GInstallFailed := True;
+  OpenDiagnosticsFolder(ExpandConstant('{app}'));
+
+  if ExitCode = -1 then
+    msg := 'No se pudo ejecutar el paso: ' + StepName + #13#10 +
+      'Revise permisos de administrador y archivos de instalacion.'
+  else
+    msg := 'La instalacion de ParqueRM no pudo completar el paso:' + #13#10 +
+      StepName + #13#10#13#10 +
+      'Codigo de salida: ' + IntToStr(ExitCode);
+
+  MsgBox(msg + #13#10#13#10 +
+    'Se abrio la carpeta de diagnostico. Envie el archivo .zip que esta en:' + #13#10 +
+    ExpandConstant('{app}\diagnostics'), mbError, MB_OK);
+
+  WizardForm.Close;
+end;
+
 function PromptSqlPasswordRetry(var NewPassword: String): Boolean;
 var
   form: TSetupForm;
@@ -548,16 +594,12 @@ var
 begin
   rc := RunPowerShellStepRaw(StepName, ScriptPath, Args, ShowWindow);
   if rc = -1 then begin
-    MsgBox('No se pudo ejecutar el paso: ' + StepName + #13#10 +
-      'Revise permisos de administrador y archivos de instalacion.', mbError, MB_OK);
-    RaiseException('ParqueRM install step could not start: ' + StepName);
+    FailInstall(StepName, rc);
+    Exit;
   end;
   if rc <> 0 then begin
-    MsgBox('La instalacion de ParqueRM no pudo completar el paso:' + #13#10 +
-      StepName + #13#10#13#10 +
-      'Codigo de salida: ' + IntToStr(rc) + #13#10#13#10 +
-      'Revise los logs en ' + ExpandConstant('{app}\logs') + ' antes de entregar el equipo.', mbError, MB_OK);
-    RaiseException('ParqueRM install step failed: ' + StepName);
+    FailInstall(StepName, rc);
+    Exit;
   end;
 end;
 
@@ -594,19 +636,12 @@ begin
         Continue;
       end;
 
-      RaiseException('ParqueRM SQL password retry cancelled.');
+      FailInstall('Inicializando base de datos...', 11);
+      Exit;
     end;
 
-    if rc = -1 then begin
-      MsgBox('No se pudo ejecutar el paso: Inicializando base de datos...' + #13#10 +
-        'Revise permisos de administrador y archivos de instalacion.', mbError, MB_OK);
-    end else begin
-      MsgBox('La instalacion de ParqueRM no pudo completar el paso:' + #13#10 +
-        'Inicializando base de datos...' + #13#10#13#10 +
-        'Codigo de salida: ' + IntToStr(rc) + #13#10#13#10 +
-        'Revise los logs en ' + ExpandConstant('{app}\logs') + ' antes de entregar el equipo.', mbError, MB_OK);
-    end;
-    RaiseException('ParqueRM install step failed: Inicializando base de datos...');
+    FailInstall('Inicializando base de datos...', rc);
+    Exit;
   end;
 end;
 
@@ -623,8 +658,10 @@ begin
     scriptsDir + '\configure-firewall.ps1',
     '',
     False);
+  if GInstallFailed then Exit;
 
   RunInitializeDbWithRetry(appDir, scriptsDir);
+  if GInstallFailed then Exit;
 
   RunPowerShellStep(
     'Generando configuracion...',
@@ -636,18 +673,21 @@ begin
     '-JwtRefreshSecret ' + PowerShellSingleQuoted(GJwtRefreshSecret) + ' ' +
     '-PreserveExistingSecrets',
     False);
+  if GInstallFailed then Exit;
 
   RunPowerShellStep(
     'Instalando servicios de Windows...',
     scriptsDir + '\install-services.ps1',
     '-InstallDir "' + appDir + '" -RuntimeDir "' + appDir + '\runtime"',
     False);
+  if GInstallFailed then Exit;
 
   RunPowerShellStep(
     'Registrando tarea de inicio automatico...',
     scriptsDir + '\register-startup-task.ps1',
     '-InstallDir "' + appDir + '"',
     False);
+  if GInstallFailed then Exit;
 
   RunPowerShellStep(
     'Validando instalacion...',

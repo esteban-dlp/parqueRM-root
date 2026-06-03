@@ -83,7 +83,7 @@ if ($candidates.Count -eq 1) {
 }
 
 # Multiple candidates -- prefer wired (Ethernet) over wireless
-$wired = $candidates | Where-Object { $_.Description -notmatch 'Wi-Fi|Wireless|802\.11|WLAN' }
+$wired = @($candidates | Where-Object { $_.Description -notmatch 'Wi-Fi|Wireless|802\.11|WLAN' })
 if ($wired.Count -eq 1) {
     if (-not $Silent) {
         Write-Host "Multiple adapters found. Selected wired: $($wired[0].IP)  (adapter: $($wired[0].Adapter))" -ForegroundColor Cyan

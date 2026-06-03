@@ -57,14 +57,12 @@ if ([string]::IsNullOrWhiteSpace($MigrationsDir)) {
     } elseif (Test-Path $devPath) {
         $MigrationsDir = (Resolve-Path $devPath).Path
     } else {
-        Write-Error "Migrations directory not found. Pass -MigrationsDir explicitly."
-        exit 1
+        throw "Migrations directory not found. Pass -MigrationsDir explicitly."
     }
 }
 
 if (-not (Test-Path $MigrationsDir)) {
-    Write-Error "Migrations directory does not exist: $MigrationsDir"
-    exit 1
+    throw "Migrations directory does not exist: $MigrationsDir"
 }
 
 # --- Locate sqlcmd ------------------------------------------------------------
@@ -85,8 +83,7 @@ if ([string]::IsNullOrWhiteSpace($SqlcmdPath)) {
 }
 
 if (-not $SqlcmdPath -or -not (Test-Path $SqlcmdPath)) {
-    Write-Error "sqlcmd.exe not found. Install SQL Server command-line tools or pass -SqlcmdPath."
-    exit 1
+    throw "sqlcmd.exe not found. Install SQL Server command-line tools or pass -SqlcmdPath."
 }
 
 Write-Host "Using sqlcmd: $SqlcmdPath" -ForegroundColor Gray
@@ -94,17 +91,57 @@ Write-Host "Using sqlcmd: $SqlcmdPath" -ForegroundColor Gray
 # --- Shared sqlcmd args -------------------------------------------------------
 $sqlArgs = @('-S', "${DbHost},${DbPort}", '-U', $DbUser, '-P', $DbPassword, '-d', $DbName)
 
-function Invoke-Sqlcmd-File([string]$file) {
-    & $SqlcmdPath @sqlArgs '-i' $file '-b'
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "Migration failed: $(Split-Path $file -Leaf). sqlcmd exit code: $LASTEXITCODE"
-        exit 1
+function Invoke-NativeCommandCapture([scriptblock]$Command) {
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = & $Command 2>&1
+        $exitCode = $LASTEXITCODE
+        return [PSCustomObject]@{
+            Output   = @($output)
+            ExitCode = $exitCode
+        }
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
     }
 }
 
+function Format-CommandOutput([object[]]$Output) {
+    return @($Output | ForEach-Object {
+        if ($null -eq $_) { '' } else { $_.ToString() }
+    } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+}
+
+function Invoke-SqlcmdChecked {
+    param(
+        [string[]]$ExtraArgs,
+        [string]$FailureMessage
+    )
+
+    $allArgs = @($sqlArgs + $ExtraArgs)
+    $result = Invoke-NativeCommandCapture { & $SqlcmdPath @allArgs }
+    if ($result.ExitCode -ne 0) {
+        $details = Format-CommandOutput $result.Output
+        if ($details.Count -gt 0) {
+            throw "$FailureMessage`n$($details -join [Environment]::NewLine)"
+        }
+        throw $FailureMessage
+    }
+
+    return @(Format-CommandOutput $result.Output)
+}
+
+function Invoke-Sqlcmd-File([string]$file) {
+    Invoke-SqlcmdChecked `
+        -ExtraArgs @('-i', $file, '-b') `
+        -FailureMessage "Migration failed: $(Split-Path $file -Leaf)." |
+        Out-Null
+}
+
 function Invoke-Sqlcmd-Query([string]$query) {
-    $result = & $SqlcmdPath @sqlArgs '-Q' $query '-h' '-1' '-W' 2>&1
-    return $result
+    return @(Invoke-SqlcmdChecked `
+        -ExtraArgs @('-Q', $query, '-h', '-1', '-W', '-b') `
+        -FailureMessage 'SQL query failed.')
 }
 
 # --- Ensure schema_migrations exists -----------------------------------------
@@ -120,26 +157,25 @@ BEGIN
     );
 END
 "@
-& $SqlcmdPath @sqlArgs '-Q' $createTable '-b'
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "Failed to ensure schema_migrations table."
-    exit 1
-}
+Invoke-SqlcmdChecked `
+    -ExtraArgs @('-Q', $createTable, '-b') `
+    -FailureMessage 'Failed to ensure schema_migrations table.' |
+    Out-Null
 
 # --- Get applied migrations ---------------------------------------------------
 $applied = @{}
-$rows = Invoke-Sqlcmd-Query "SET NOCOUNT ON; SELECT migration_name FROM schema_migrations"
+$rows = @(Invoke-Sqlcmd-Query "SET NOCOUNT ON; SELECT migration_name FROM schema_migrations")
 foreach ($row in $rows) {
     $name = ($row -replace '^\s+|\s+$', '')
     if ($name) { $applied[$name] = $true }
 }
 
 # --- Get migration files ------------------------------------------------------
-$files = Get-ChildItem -Path $MigrationsDir -Filter '*.sql' | Sort-Object Name
+$files = @(Get-ChildItem -Path $MigrationsDir -Filter '*.sql' -File -ErrorAction SilentlyContinue | Sort-Object Name)
 
 if ($files.Count -eq 0) {
     Write-Host "No migration files found in $MigrationsDir" -ForegroundColor Yellow
-    exit 0
+    return
 }
 
 Write-Host "Found $($files.Count) migration file(s)." -ForegroundColor Gray
@@ -161,11 +197,10 @@ foreach ($file in $files) {
 
     # Record success
     $recordSql = "INSERT INTO schema_migrations (migration_name) VALUES ('$($name -replace "'","''")')"
-    & $SqlcmdPath @sqlArgs '-Q' $recordSql '-b'
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "Migration ran but could not record in schema_migrations: $name"
-        exit 1
-    }
+    Invoke-SqlcmdChecked `
+        -ExtraArgs @('-Q', $recordSql, '-b') `
+        -FailureMessage "Migration ran but could not record in schema_migrations: $name" |
+        Out-Null
 
     Write-Host "  [APPLIED] $name" -ForegroundColor Green
     $applied_count++

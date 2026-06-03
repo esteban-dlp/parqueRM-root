@@ -110,12 +110,8 @@ function New-BcryptHash([string]$PlainTextPassword) {
         exit 1
     }
 
-    $nodePath = Join-Path $RuntimeCacheDir 'node\node.exe'
-    if (-not (Test-Path $nodePath)) {
-        $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
-        if ($nodeCmd) { $nodePath = $nodeCmd.Source }
-    }
-    if (-not (Test-Path $nodePath)) {
+    $nodePath = Get-BackendNodePath
+    if ([string]::IsNullOrWhiteSpace($nodePath)) {
         Write-Log "ERROR: node.exe not found; cannot hash admin password." 'Red'
         exit 1
     }
@@ -141,6 +137,48 @@ function New-BcryptHash([string]$PlainTextPassword) {
     }
 }
 
+function Test-BcryptHash([string]$PlainTextPassword, [string]$Hash) {
+    if ([string]::IsNullOrWhiteSpace($PlainTextPassword) -or [string]::IsNullOrWhiteSpace($Hash)) {
+        return $false
+    }
+
+    $nodePath = Get-BackendNodePath
+    if ([string]::IsNullOrWhiteSpace($nodePath)) {
+        Write-Log "ERROR: node.exe not found; cannot verify admin password." 'Red'
+        return $false
+    }
+
+    $backendDir = Join-Path $InstallDir 'app\backend'
+    $script = "const path=require('path'); const bcrypt=require(path.join(process.cwd(),'node_modules','bcrypt')); bcrypt.compare(process.env.PARQUERM_ADMIN_PASSWORD,process.env.PARQUERM_ADMIN_HASH).then(ok=>process.stdout.write(ok?'true':'false')).catch(e=>{console.error(e && e.stack || e); process.exit(1);});"
+    $oldPasswordEnv = $env:PARQUERM_ADMIN_PASSWORD
+    $oldHashEnv = $env:PARQUERM_ADMIN_HASH
+    $env:PARQUERM_ADMIN_PASSWORD = $PlainTextPassword
+    $env:PARQUERM_ADMIN_HASH = $Hash
+    try {
+        Push-Location $backendDir
+        try {
+            $result = & $nodePath -e $script
+            if ($LASTEXITCODE -ne 0) { return $false }
+            return (($result | Select-Object -First 1).Trim() -eq 'true')
+        } finally {
+            Pop-Location
+        }
+    } finally {
+        $env:PARQUERM_ADMIN_PASSWORD = $oldPasswordEnv
+        $env:PARQUERM_ADMIN_HASH = $oldHashEnv
+    }
+}
+
+function Get-BackendNodePath {
+    $nodePath = Join-Path $RuntimeCacheDir 'node\node.exe'
+    if (Test-Path $nodePath) { return $nodePath }
+
+    $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCmd -and (Test-Path $nodeCmd.Source)) { return $nodeCmd.Source }
+
+    return ''
+}
+
 function Write-Log([string]$msg, [string]$color = 'White') {
     $line = "[$(Get-Date -Format 'HH:mm:ss')] $msg"
     Write-Host $line -ForegroundColor $color
@@ -149,6 +187,21 @@ function Write-Log([string]$msg, [string]$color = 'White') {
 
 function ConvertTo-SqlLiteral([string]$Value) {
     return "N'$($Value.Replace("'", "''"))'"
+}
+
+function Invoke-NativeCommandCapture([scriptblock]$Command) {
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = & $Command 2>&1
+        $exitCode = $LASTEXITCODE
+        return [PSCustomObject]@{
+            Output   = @($output)
+            ExitCode = $exitCode
+        }
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
 }
 
 function ConvertTo-WindowsCommandLineArgument([string]$Value) {
@@ -275,8 +328,9 @@ function Invoke-SqlcmdChecked {
         [string]$FailureMessage
     )
 
-    $output = & $sqlcmd @Arguments 2>&1
-    $exitCode = $LASTEXITCODE
+    $result = Invoke-NativeCommandCapture { & $sqlcmd @Arguments }
+    $output = $result.Output
+    $exitCode = $result.ExitCode
     if ($output) {
         $output | ForEach-Object { Add-Content -Path $LogFile -Value $_ }
     }
@@ -291,8 +345,9 @@ function Invoke-SqlcmdChecked {
 }
 
 function Test-SaLogin([string[]]$Arguments) {
-    $output = & $sqlcmd @Arguments '-Q' 'SELECT 1' '-b' 2>&1
-    $exitCode = $LASTEXITCODE
+    $result = Invoke-NativeCommandCapture { & $sqlcmd @Arguments '-Q' 'SELECT 1' '-b' }
+    $output = $result.Output
+    $exitCode = $result.ExitCode
     if ($exitCode -ne 0 -and $output) {
         $output | ForEach-Object { Add-Content -Path $LogFile -Value $_ }
     }
@@ -314,8 +369,9 @@ ALTER LOGIN [sa] WITH PASSWORD=$passwordLiteral UNLOCK;
 "@
 
     Write-Log "Attempting to enable/update SQL 'sa' login using Windows authentication..." 'Yellow'
-    $output = & $sqlcmd '-S' '127.0.0.1,1433' '-E' '-Q' $repairSql '-b' 2>&1
-    $exitCode = $LASTEXITCODE
+    $result = Invoke-NativeCommandCapture { & $sqlcmd '-S' '127.0.0.1,1433' '-E' '-Q' $repairSql '-b' }
+    $output = $result.Output
+    $exitCode = $result.ExitCode
     if ($output) {
         $output | ForEach-Object { Add-Content -Path $LogFile -Value $_ }
     }
@@ -481,15 +537,27 @@ if (-not (Test-Path $InitScriptsDir)) {
 Write-Log "=== Step 4b: Admin user password ===" 'Cyan'
 $adminHashSql = $AdminPasswordHash.Replace("'", "''")
 $setAdminPasswordSql = @"
+DECLARE @adminRoleId INT = (SELECT TOP 1 id FROM dbo.roles WHERE name = N'Administrador' ORDER BY id);
+
+IF @adminRoleId IS NOT NULL
+BEGIN
+    UPDATE dbo.roles
+    SET is_active = 1,
+        deleted_at = NULL,
+        updated_at = SYSDATETIME()
+    WHERE id = @adminRoleId;
+END
+
 UPDATE dbo.users
 SET password_hash = N'$adminHashSql',
+    role_id = COALESCE(@adminRoleId, role_id),
     is_active = 1,
+    deleted_at = NULL,
     updated_at = SYSDATETIME()
 WHERE username = N'admin';
 
 IF @@ROWCOUNT = 0
 BEGIN
-    DECLARE @adminRoleId INT = (SELECT TOP 1 id FROM dbo.roles WHERE name = N'Administrador' ORDER BY id);
     INSERT INTO dbo.users
     (
         role_id,
@@ -518,14 +586,27 @@ END
 "@
 
 Invoke-SqlcmdChecked -Arguments ($sqlArgs + @('-d', $DbName, '-Q', $setAdminPasswordSql, '-b')) -FailureMessage 'Failed to set admin user password.' | Out-Null
-Write-Log "Admin user password ready." 'Green'
+
+$storedAdminHashRows = Invoke-SqlcmdChecked `
+    -Arguments ($sqlArgs + @('-d', $DbName, '-Q', "SET NOCOUNT ON; SELECT password_hash FROM dbo.users WHERE username = N'admin';", '-h', '-1', '-W', '-b')) `
+    -FailureMessage 'Failed to verify admin user password.'
+$storedAdminHash = @($storedAdminHashRows | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ } | Select-Object -First 1)
+if (-not (Test-BcryptHash $AdminPassword $storedAdminHash)) {
+    Write-Log "ERROR: Admin user password was written, but bcrypt verification did not match." 'Red'
+    exit 1
+}
+Write-Log "Admin user password ready and verified." 'Green'
 
 # --- Step 6: Run migrations ---------------------------------------------------
 Write-Log "=== Step 5: Migrations ===" 'Cyan'
 $migrateScript = Join-Path $ScriptDir 'run-migrations.ps1'
 if (Test-Path $migrateScript) {
-    & $migrateScript -SqlcmdPath $sqlcmd -DbHost '127.0.0.1' -DbPassword $DbPassword -DbName $DbName -MigrationsDir $MigrationsDir
-    if ($LASTEXITCODE -ne 0) { Write-Log "Migration step failed." 'Red'; exit 1 }
+    try {
+        & $migrateScript -SqlcmdPath $sqlcmd -DbHost '127.0.0.1' -DbPassword $DbPassword -DbName $DbName -MigrationsDir $MigrationsDir
+    } catch {
+        Write-Log "Migration step failed: $($_.Exception.Message)" 'Red'
+        exit 1
+    }
 } else {
     Write-Log "run-migrations.ps1 not found -- skipping." 'Yellow'
 }
