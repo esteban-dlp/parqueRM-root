@@ -18,7 +18,7 @@ El objetivo operativo es que el usuario final haga esto:
 2. Elegir instalacion completa o solo cliente.
 3. Ingresar la IP del servidor si no fue detectada automaticamente.
 4. Ingresar la contrasena tecnica de SQL Server.
-5. Ingresar la contrasena del usuario `admin` de ParqueRM.
+5. Leer las credenciales iniciales del usuario `admin` de ParqueRM.
 6. Esperar a que el instalador configure base de datos, archivos, servicios, firewall y accesos directos.
 7. Abrir ParqueRM desde el acceso directo.
 
@@ -103,7 +103,7 @@ Preguntas principales:
 
 - IP del servidor, si no se detecta automaticamente.
 - Contrasena SQL Server `sa`.
-- Contrasena del usuario web `admin`.
+- Credenciales iniciales del usuario web `admin`.
 - Secretos JWT, generados automaticamente y editables.
 
 ### 4.2 Solo cliente
@@ -327,12 +327,13 @@ Hace lo siguiente:
 9. Si la contrasena no sirve o SQL la rechaza, devuelve codigo especial para que el instalador la vuelva a pedir.
 10. Crea la base `ParqueRM` si no existe.
 11. Ejecuta scripts `db\init`, excepto `01_create_database.sql` porque la base ya fue creada por el script.
-12. Genera hash bcrypt para la contrasena web de `admin`.
-13. Actualiza o inserta el usuario `admin`.
-14. Reactiva el usuario `admin`, limpia `deleted_at` y asegura el rol `Administrador`.
-15. Verifica con bcrypt que la contrasena ingresada realmente coincida con el hash guardado.
-16. Ejecuta migraciones pendientes.
-17. Escribe `C:\ParqueRM\config\db-ready.json`.
+12. Detecta si el usuario `admin` ya existia antes de correr las seeds.
+13. Si `admin` ya existia, conserva su contrasena actual.
+14. Si `admin` no existia, genera hash bcrypt para la contrasena inicial `admin1`.
+15. Actualiza o inserta el usuario `admin` solo para la instalacion inicial.
+16. Verifica con bcrypt que `admin1` coincida con el hash guardado en instalaciones nuevas.
+17. Ejecuta migraciones pendientes.
+18. Escribe `C:\ParqueRM\config\db-ready.json`.
 
 El marcador `db-ready.json` es importante. Los servicios no se instalan si la base no fue inicializada correctamente.
 
@@ -554,7 +555,15 @@ El usuario de login web es:
 admin
 ```
 
-El instalador pide la contrasena de este usuario y guarda solo un hash bcrypt en:
+En una instalacion nueva, la contrasena inicial es:
+
+```text
+admin1
+```
+
+El instalador ya no pide la contrasena de este usuario. Si `admin` ya existia antes de correr la inicializacion, conserva su contrasena actual.
+
+Solo se guarda un hash bcrypt en:
 
 ```text
 dbo.users.password_hash
@@ -564,12 +573,13 @@ No se guarda la contrasena en texto plano.
 
 El flujo actual:
 
-1. Usuario ingresa contrasena admin.
-2. El instalador genera un hash bcrypt usando Node.js y `bcrypt`.
-3. Actualiza o crea `dbo.users` con `username = N'admin'`.
-4. Reactiva usuario y rol.
-5. Lee el hash guardado.
-6. Verifica que la contrasena ingresada coincida con el hash guardado.
+1. El instalador revisa si `dbo.users` ya tenia `username = N'admin'` antes de correr las seeds.
+2. Si ya existia, no cambia su hash.
+3. Si no existia, usa la contrasena inicial `admin1`.
+4. Genera un hash bcrypt usando Node.js y `bcrypt`.
+5. Actualiza o crea `dbo.users` con `username = N'admin'`.
+6. Lee el hash guardado.
+7. Verifica que `admin1` coincida con el hash guardado.
 
 Si la verificacion falla, la instalacion debe fallar con log claro.
 
@@ -1193,7 +1203,7 @@ Invoke-WebRequest http://127.0.0.1/api/health/database -UseBasicParsing
 - [ ] Instalar como administrador.
 - [ ] Confirmar que detecta IP correcta.
 - [ ] Probar contrasena SQL nueva.
-- [ ] Probar contrasena admin ingresada.
+- [ ] Probar login inicial `admin` / `admin1` en VM limpia.
 - [ ] Confirmar servicios corriendo.
 - [ ] Abrir `http://127.0.0.1/`.
 - [ ] Abrir `http://IP_LAN/` desde la misma VM.
@@ -1207,7 +1217,8 @@ Invoke-WebRequest http://127.0.0.1/api/health/database -UseBasicParsing
 
 - [ ] Entregar instalador `.exe`.
 - [ ] Entregar usuario inicial: `admin`.
-- [ ] Aclarar que la contrasena admin es la que el cliente escribio durante instalacion.
+- [ ] Aclarar que la contrasena inicial admin es `admin1` solo en instalaciones nuevas.
+- [ ] Aclarar que una reinstalacion conserva la contrasena admin existente.
 - [ ] Aclarar que la contrasena admin no se puede recuperar, solo resetear.
 - [ ] Recomendacion de IP fija o reserva DHCP.
 - [ ] Indicar ruta de backups: `C:\ParqueRM\backups`.
@@ -1254,6 +1265,8 @@ Por defecto:
 
 La contrasena web de `admin`:
 
+- En instalaciones nuevas inicia como `admin1`.
+- En reinstalaciones conserva la contrasena existente.
 - No se guarda en texto plano.
 - Se guarda como bcrypt.
 - No es recuperable.
@@ -1390,4 +1403,3 @@ Cuando el cliente reporta que ParqueRM no abre:
 9. Antes de cambios destructivos, crear backup `.bak`.
 
 El instalador debe ser tratado como sistema offline de produccion: cualquier mejora debe probarse en VM limpia y en VM con SQL Server ya instalado.
-

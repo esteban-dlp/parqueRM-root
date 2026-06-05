@@ -36,9 +36,10 @@ $LogBackend   = Join-Path $InstallDir 'logs\backend'
 $LogFrontend  = Join-Path $InstallDir 'logs\frontend'
 $ConfigDir    = Join-Path $InstallDir 'config'
 $ServicesDir  = Join-Path $InstallDir 'services'
+$UploadsDir   = Join-Path $InstallDir 'data\uploads'
 $DbReadyPath  = Join-Path $ConfigDir 'db-ready.json'
 
-foreach ($d in @($LogBackend, $LogFrontend, $ServicesDir)) {
+foreach ($d in @($LogBackend, $LogFrontend, $ServicesDir, (Join-Path $UploadsDir 'logos'))) {
     if (-not (Test-Path $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
 }
 
@@ -88,6 +89,10 @@ Write-Host "Using Caddy: $caddyPath" -ForegroundColor Gray
 $caddyFile = Join-Path $InstallDir 'config\Caddyfile'
 $caddyContent = @"
 :80 {
+    handle /uploads/* {
+        reverse_proxy 127.0.0.1:3000
+    }
+
     handle /api/* {
         reverse_proxy 127.0.0.1:3000
     }
@@ -107,6 +112,11 @@ $caddyContent | Out-File -FilePath $caddyFile -Encoding utf8
 Write-Host "  Wrote Caddyfile: $caddyFile" -ForegroundColor Green
 
 # --- Helper: install one WinSW service ---------------------------------------
+function ConvertTo-XmlEscaped([AllowNull()][string]$Value) {
+    if ($null -eq $Value) { return '' }
+    return [System.Security.SecurityElement]::Escape($Value)
+}
+
 function Install-WinSwService {
     param(
         [string]$ServiceId,
@@ -131,20 +141,30 @@ function Install-WinSwService {
     $envXml = ''
     foreach ($ev in $EnvVars) {
         $parts = $ev -split '=', 2
-        $envXml += "    <env name=`"$($parts[0])`" value=`"$($parts[1])`" />`n"
+        $envName = ConvertTo-XmlEscaped $parts[0]
+        $envValue = if ($parts.Count -gt 1) { ConvertTo-XmlEscaped $parts[1] } else { '' }
+        $envXml += "    <env name=`"$envName`" value=`"$envValue`" />`n"
     }
+
+    $xmlServiceId = ConvertTo-XmlEscaped $ServiceId
+    $xmlDisplayName = ConvertTo-XmlEscaped $DisplayName
+    $xmlDescription = ConvertTo-XmlEscaped $Description
+    $xmlExecutable = ConvertTo-XmlEscaped $Executable
+    $xmlArguments = ConvertTo-XmlEscaped $Arguments
+    $xmlWorkingDir = ConvertTo-XmlEscaped $WorkingDir
+    $xmlLogDir = ConvertTo-XmlEscaped $LogDir
 
     $xmlContent = @"
 <service>
-  <id>$ServiceId</id>
-  <name>$DisplayName</name>
-  <description>$Description</description>
-  <executable>$Executable</executable>
-  <arguments>$Arguments</arguments>
-  <workingdirectory>$WorkingDir</workingdirectory>
+  <id>$xmlServiceId</id>
+  <name>$xmlDisplayName</name>
+  <description>$xmlDescription</description>
+  <executable>$xmlExecutable</executable>
+  <arguments>$xmlArguments</arguments>
+  <workingdirectory>$xmlWorkingDir</workingdirectory>
   <startmode>Automatic</startmode>
   <logmode>rotate</logmode>
-  <logpath>$LogDir</logpath>
+  <logpath>$xmlLogDir</logpath>
   <onfailure action="restart" delay="10 sec"/>
   <onfailure action="restart" delay="20 sec"/>
   <onfailure action="none"/>
@@ -188,7 +208,7 @@ Install-WinSwService `
     -Arguments    "dist\main.js" `
     -WorkingDir   $BackendDir `
     -LogDir       $LogBackend `
-    -EnvVars      @("NODE_ENV=production", "PATH=$nodeDir;$env:PATH")
+    -EnvVars      @("NODE_ENV=production", "UPLOADS_PATH=$UploadsDir", "PATH=$nodeDir;$env:PATH")
 
 # Set env file path via SC (WinSW reads XML env but also inherits system env)
 # The .env is loaded by the backend via @nestjs/config dotenv support

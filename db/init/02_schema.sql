@@ -286,7 +286,7 @@ BEGIN
         amount_local DECIMAL(12,2) NOT NULL,
         amount_foreign DECIMAL(12,2) NOT NULL DEFAULT 0,
         is_active BIT NOT NULL DEFAULT 1,
-        valid_from DATE NOT NULL DEFAULT CAST(GETDATE() AS DATE),
+        valid_from DATE NOT NULL DEFAULT CAST(DATEADD(HOUR, -6, SYSUTCDATETIME()) AS DATE),
         valid_to DATE NULL,
         deleted_at DATETIME2 NULL,
 
@@ -313,7 +313,7 @@ BEGIN
         id INT IDENTITY(1,1) PRIMARY KEY,
         ticket_number NVARCHAR(50) NOT NULL UNIQUE,
 
-        record_date DATE NOT NULL DEFAULT CAST(GETDATE() AS DATE),
+        record_date DATE NOT NULL DEFAULT CAST(DATEADD(HOUR, -6, SYSUTCDATETIME()) AS DATE),
         check_in_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
         check_out_at DATETIME2 NULL,
 
@@ -444,7 +444,7 @@ BEGIN
     CREATE TABLE lodging_records (
         id INT IDENTITY(1,1) PRIMARY KEY,
         lodging_type_id INT NOT NULL,
-        record_date DATE NOT NULL DEFAULT CAST(GETDATE() AS DATE),
+        record_date DATE NOT NULL DEFAULT CAST(DATEADD(HOUR, -6, SYSUTCDATETIME()) AS DATE),
         nights INT NOT NULL,
         guests INT NOT NULL,
 

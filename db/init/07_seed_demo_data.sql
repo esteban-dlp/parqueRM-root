@@ -191,7 +191,12 @@ BEGIN
         1, 'MANUAL', @adminId
     );
     SET @vehicleId2 = SCOPE_IDENTITY();
+END
+SET @vehicleId2 = (SELECT TOP 1 id FROM vehicle_records WHERE plate_number = 'BUS-0392' ORDER BY id);
 
+IF @vehicleId2 IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM receipts WHERE receipt_number = 'REC-DEMO-003')
+BEGIN
     INSERT INTO receipts (
         receipt_number, receipt_date, origin_type, origin_id,
         payment_method_id, total, amount_received, change_amount,
@@ -235,7 +240,12 @@ BEGIN
         N'Grupo de investigación — demo', @adminId
     );
     SET @lodgingId2 = SCOPE_IDENTITY();
+END
+SET @lodgingId2 = (SELECT TOP 1 id FROM lodging_records WHERE observations = N'Grupo de investigación — demo' ORDER BY id);
 
+IF @lodgingId2 IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM receipts WHERE receipt_number = 'REC-DEMO-004')
+BEGIN
     INSERT INTO receipts (
         receipt_number, receipt_date, origin_type, origin_id,
         payment_method_id, total, amount_received, change_amount,

@@ -26,6 +26,7 @@
 #define AppPublisher "Parque Nacional"
 #define AppURL       "http://localhost"
 #define DefaultDir   "C:\ParqueRM"
+#define DefaultAdminPassword "admin1"
 #define SetupExeName "ParqueRM-Setup-v" + AppVersion
 
 [Setup]
@@ -103,6 +104,7 @@ Name: "{app}\logs\db-init";  Components: server
 Name: "{app}\backups";       Components: server
 Name: "{app}\config";        Components: server
 Name: "{app}\services";      Components: server
+Name: "{app}\data\uploads\logos"; Components: server
 
 [Icons]
 ; --- Server shortcuts -----------------------------------------------------------
@@ -154,7 +156,7 @@ Type: filesandordirs; Name: "{app}\services"
 var
   ServerIpPage:       TInputQueryWizardPage;
   DbPasswordPage:     TInputQueryWizardPage;
-  AdminPasswordPage:  TInputQueryWizardPage;
+  AdminInfoPage:      TOutputMsgWizardPage;
   JwtPage:            TInputQueryWizardPage;
   ClientServerIpPage: TInputQueryWizardPage;
   GServerIp:          String;
@@ -164,6 +166,9 @@ var
   GJwtRefreshSecret:  String;
   GExistingInstall:   Boolean;
   GInstallFailed:     Boolean;
+
+function SetEnvironmentVariable(lpName: String; lpValue: String): Boolean;
+  external 'SetEnvironmentVariableW@kernel32.dll stdcall';
 
 function DetectLanIp: String;
 var
@@ -212,6 +217,7 @@ begin
   GExistingInstall := FileExists(ExpandConstant('{#DefaultDir}\app\backend\.env'));
   GInstallFailed := False;
   GServerIp := DetectLanIp;
+  GAdminPassword := '{#DefaultAdminPassword}';
 
   { Server IP page -- shown only in server mode }
   ServerIpPage := CreateInputQueryPage(wpSelectComponents,
@@ -237,16 +243,17 @@ begin
   DbPasswordPage.Add('Contrasena:', True);
   DbPasswordPage.Add('Confirmar contrasena:', True);
 
-  { Admin password page }
-  AdminPasswordPage := CreateInputQueryPage(DbPasswordPage.ID,
-    'Contrasena del usuario admin',
-    'Ingrese la contrasena para iniciar sesion en ParqueRM.',
-    'El usuario sera "admin". Esta contrasena no es la contrasena tecnica de SQL Server.');
-  AdminPasswordPage.Add('Contrasena admin:', True);
-  AdminPasswordPage.Add('Confirmar contrasena admin:', True);
+  { Admin credentials info page }
+  AdminInfoPage := CreateOutputMsgPage(DbPasswordPage.ID,
+    'Usuario admin inicial',
+    'Credenciales iniciales de ParqueRM',
+    'Usuario: admin' + #13#10 +
+    'Contrasena inicial: {#DefaultAdminPassword}' + #13#10#13#10 +
+    'Si esta computadora ya tenia ParqueRM instalado, use la contrasena admin que ya tenia antes. ' +
+    'El instalador no cambiara la contrasena de un usuario admin existente.');
 
   { JWT secrets page -- pre-filled with random secrets }
-  JwtPage := CreateInputQueryPage(AdminPasswordPage.ID,
+  JwtPage := CreateInputQueryPage(AdminInfoPage.ID,
     'Secretos JWT',
     'Secretos para firmar tokens de acceso y refresco.',
     'Se generaron secretos aleatorios. Puede dejarlos como estan o ingresar los suyos.');
@@ -261,9 +268,9 @@ var
   isServer: Boolean;
 begin
   isServer := WizardIsComponentSelected('server');
-  if (PageID = ServerIpPage.ID) and ((not isServer) or (GServerIp <> '')) then Result := True
+  if (PageID = ServerIpPage.ID) and (not isServer) then Result := True
   else if (PageID = DbPasswordPage.ID) and (not isServer) then Result := True
-  else if (PageID = AdminPasswordPage.ID) and (not isServer) then Result := True
+  else if (PageID = AdminInfoPage.ID) and (not isServer) then Result := True
   else if (PageID = JwtPage.ID) and ((not isServer) or GExistingInstall) then Result := True
   else if (PageID = ClientServerIpPage.ID) and isServer then Result := True
   else Result := False;
@@ -321,26 +328,6 @@ begin
     GDbPassword := DbPasswordPage.Values[0];
   end;
 
-  if CurPageID = AdminPasswordPage.ID then begin
-    if AdminPasswordPage.Values[0] = '' then begin
-      MsgBox('La contrasena admin no puede estar vacia.', mbError, MB_OK);
-      Result := False; Exit;
-    end;
-    if Pos('"', AdminPasswordPage.Values[0]) > 0 then begin
-      MsgBox('La contrasena admin no puede contener comillas dobles.', mbError, MB_OK);
-      Result := False; Exit;
-    end;
-    if Length(AdminPasswordPage.Values[0]) < 8 then begin
-      MsgBox('La contrasena admin debe tener al menos 8 caracteres.', mbError, MB_OK);
-      Result := False; Exit;
-    end;
-    if AdminPasswordPage.Values[0] <> AdminPasswordPage.Values[1] then begin
-      MsgBox('Las contrasenas admin no coinciden.', mbError, MB_OK);
-      Result := False; Exit;
-    end;
-    GAdminPassword := AdminPasswordPage.Values[0];
-  end;
-
   if CurPageID = JwtPage.ID then begin
     if Length(JwtPage.Values[0]) < 16 then begin
       MsgBox('El JWT Secret debe tener al menos 16 caracteres.', mbError, MB_OK);
@@ -386,16 +373,6 @@ end;
 function GetDbPasswordPs(Param: String): String;
 begin
   Result := PowerShellSingleQuoted(GDbPassword);
-end;
-
-function GetAdminPassword(Param: String): String;
-begin
-  Result := GAdminPassword;
-end;
-
-function GetAdminPasswordPs(Param: String): String;
-begin
-  Result := PowerShellSingleQuoted(GAdminPassword);
 end;
 
 function GetJwtSecret(Param: String): String;
@@ -447,12 +424,32 @@ begin
   end;
 end;
 
+procedure TryStartExistingServices;
+var
+  rc: Integer;
+  ps: String;
+begin
+  ps :=
+    '$services=''ParqueRMBackend'',''ParqueRMFrontend'';' +
+    'foreach($svcName in $services){' +
+    '  $svc=Get-Service $svcName -ErrorAction SilentlyContinue;' +
+    '  if($svc -and $svc.Status -ne ''Running''){' +
+    '    Start-Service $svcName -ErrorAction SilentlyContinue' +
+    '  }' +
+    '};';
+
+  Exec('powershell.exe',
+    '-NoProfile -ExecutionPolicy Bypass -Command "' + ps + '"',
+    '', SW_HIDE, ewWaitUntilTerminated, rc);
+end;
+
 procedure FailInstall(StepName: String; ExitCode: Integer);
 var
   msg: String;
 begin
   GInstallFailed := True;
   OpenDiagnosticsFolder(ExpandConstant('{app}'));
+  TryStartExistingServices;
 
   if ExitCode = -1 then
     msg := 'No se pudo ejecutar el paso: ' + StepName + #13#10 +
@@ -609,7 +606,7 @@ begin
     '-InstallDir "' + appDir + '" ' +
     '-RuntimeCacheDir "' + appDir + '\runtime" ' +
     '-DbPassword ' + PowerShellSingleQuoted(GDbPassword) + ' ' +
-    '-AdminPassword ' + PowerShellSingleQuoted(GAdminPassword) + ' ' +
+    '-AdminPasswordEnv "PARQUERM_INSTALLER_ADMIN_PASSWORD" ' +
     '-InitScriptsDir "' + appDir + '\app\database\init" ' +
     '-MigrationsDir "' + appDir + '\app\database\migrations" ' +
     '-SkipSqlServerInstall:' + SkipSqlInstall('');
@@ -620,28 +617,37 @@ var
   rc: Integer;
   retryPassword: String;
 begin
-  while True do begin
-    rc := RunPowerShellStepRaw(
-      'Inicializando base de datos...',
-      scriptsDir + '\initialize-db.ps1',
-      InitializeDbArgs(appDir),
-      False);
+  if not SetEnvironmentVariable('PARQUERM_INSTALLER_ADMIN_PASSWORD', GAdminPassword) then begin
+    FailInstall('Preparando usuario admin inicial...', -1);
+    Exit;
+  end;
 
-    if rc = 0 then
-      Exit;
+  try
+    while True do begin
+      rc := RunPowerShellStepRaw(
+        'Inicializando base de datos...',
+        scriptsDir + '\initialize-db.ps1',
+        InitializeDbArgs(appDir),
+        False);
 
-    if rc = 11 then begin
-      if PromptSqlPasswordRetry(retryPassword) then begin
-        GDbPassword := retryPassword;
-        Continue;
+      if rc = 0 then
+        Exit;
+
+      if rc = 11 then begin
+        if PromptSqlPasswordRetry(retryPassword) then begin
+          GDbPassword := retryPassword;
+          Continue;
+        end;
+
+        FailInstall('Inicializando base de datos...', 11);
+        Exit;
       end;
 
-      FailInstall('Inicializando base de datos...', 11);
+      FailInstall('Inicializando base de datos...', rc);
       Exit;
     end;
-
-    FailInstall('Inicializando base de datos...', rc);
-    Exit;
+  finally
+    SetEnvironmentVariable('PARQUERM_INSTALLER_ADMIN_PASSWORD', '');
   end;
 end;
 

@@ -54,8 +54,9 @@ $ErrorActionPreference = 'Stop'
 $BackendDir  = Join-Path $InstallDir 'app\backend'
 $FrontendDist = Join-Path $InstallDir 'app\frontend\dist'
 $ConfigDir   = Join-Path $InstallDir 'config'
+$UploadsDir  = Join-Path $InstallDir 'data\uploads'
 
-foreach ($dir in @($BackendDir, $FrontendDist, $ConfigDir)) {
+foreach ($dir in @($BackendDir, $FrontendDist, $ConfigDir, (Join-Path $UploadsDir 'logos'))) {
     if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
 }
 
@@ -175,6 +176,7 @@ JWT_REFRESH_SECRET=$(ConvertTo-DotEnvValue $JwtRefreshSecret)
 CORS_ORIGIN=$(ConvertTo-DotEnvValue $FrontendUrl)
 PUBLIC_FRONTEND_URL=$(ConvertTo-DotEnvValue $FrontendUrl)
 PUBLIC_BACKEND_URL=$(ConvertTo-DotEnvValue $BackendUrl)
+UPLOADS_PATH=$(ConvertTo-DotEnvValue $UploadsDir)
 "@
 
 $envContent | Out-File -FilePath $envPath -Encoding utf8 -NoNewline

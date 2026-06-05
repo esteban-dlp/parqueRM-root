@@ -37,6 +37,7 @@ param(
     [string]$RuntimeCacheDir      = '',
     [string]$DbPassword           = '',
     [string]$AdminPassword        = '',
+    [string]$AdminPasswordEnv     = '',
     [string]$DbName               = 'ParqueRM',
     [string]$SkipSqlServerInstall = 'false',
     [string]$InitScriptsDir       = '',
@@ -46,6 +47,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $ExitCodeSqlPasswordRetry = 11
+$DefaultAdminPassword = 'admin1'
 
 $ScriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
 
@@ -106,7 +108,7 @@ if ([string]::IsNullOrWhiteSpace($DbPassword)) {
 
 function New-BcryptHash([string]$PlainTextPassword) {
     if ([string]::IsNullOrWhiteSpace($PlainTextPassword)) {
-        Write-Log "ERROR: AdminPassword is required; refusing to keep the seed/default admin password." 'Red'
+        Write-Log "ERROR: Initial admin password is required." 'Red'
         exit 1
     }
 
@@ -183,6 +185,37 @@ function Write-Log([string]$msg, [string]$color = 'White') {
     $line = "[$(Get-Date -Format 'HH:mm:ss')] $msg"
     Write-Host $line -ForegroundColor $color
     Add-Content -Path $LogFile -Value $line
+}
+
+function Get-SecretFingerprint([string]$Value) {
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($Value)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $hashBytes = $sha.ComputeHash($bytes)
+    } finally {
+        $sha.Dispose()
+    }
+
+    $hex = (($hashBytes | ForEach-Object { $_.ToString('x2') }) -join '')
+    return $hex.Substring(0, 12)
+}
+
+function Resolve-AdminPassword {
+    if (-not [string]::IsNullOrWhiteSpace($AdminPasswordEnv)) {
+        $envValue = [Environment]::GetEnvironmentVariable($AdminPasswordEnv, 'Process')
+        if ($null -ne $envValue) {
+            return $envValue
+        }
+
+        Write-Log "ERROR: Admin password environment variable '$AdminPasswordEnv' was not available to initialize-db.ps1." 'Red'
+        exit 1
+    }
+
+    if (-not [string]::IsNullOrEmpty($AdminPassword)) {
+        return $AdminPassword
+    }
+
+    return $DefaultAdminPassword
 }
 
 function ConvertTo-SqlLiteral([string]$Value) {
@@ -342,6 +375,73 @@ function Invoke-SqlcmdChecked {
         exit 1
     }
     return $output
+}
+
+function Format-CommandOutput([object[]]$Output) {
+    return @($Output | ForEach-Object {
+        if ($null -eq $_) { '' } else { $_.ToString() }
+    } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+}
+
+function Test-SqlcmdUnsupportedOption([object[]]$Output, [string]$OptionName) {
+    $text = (@(Format-CommandOutput $Output) -join "`n")
+    if ([string]::IsNullOrWhiteSpace($text)) { return $false }
+
+    $escapedOption = [regex]::Escape($OptionName)
+    $optionFirstPattern = "(?i)(^|\s|:)[`"'\-]?$escapedOption[`"']?\s*:\s*unknown\s+(option|flag)"
+    $unknownFirstPattern = "(?i)unknown\s+(option|flag|shorthand\s+flag).*?[`"'\-]?$escapedOption\b"
+    return (($text -match $optionFirstPattern) -or ($text -match $unknownFirstPattern))
+}
+
+function Write-SqlcmdOutputToLog([object[]]$Output) {
+    $lines = @(Format-CommandOutput $Output)
+    if ($lines.Count -gt 0) {
+        $lines | ForEach-Object { Add-Content -Path $LogFile -Value $_ }
+    }
+}
+
+function Invoke-SqlcmdFileChecked {
+    param(
+        [string[]]$Arguments,
+        [string]$FilePath,
+        [string]$FailureMessage
+    )
+
+    $argsWithUtf8 = @($Arguments + @('-f', '65001', '-i', $FilePath, '-b'))
+    $result = Invoke-NativeCommandCapture { & $sqlcmd @argsWithUtf8 }
+    if ($result.ExitCode -ne 0 -and (Test-SqlcmdUnsupportedOption $result.Output 'f')) {
+        Write-SqlcmdOutputToLog $result.Output
+        Write-Log "sqlcmd does not support -f 65001; retrying $(Split-Path $FilePath -Leaf) without the UTF-8 flag." 'Yellow'
+        $argsDefaultEncoding = @($Arguments + @('-i', $FilePath, '-b'))
+        $result = Invoke-NativeCommandCapture { & $sqlcmd @argsDefaultEncoding }
+    }
+
+    Write-SqlcmdOutputToLog $result.Output
+    if ($result.ExitCode -ne 0) {
+        Write-Log $FailureMessage 'Red'
+        $details = @(Format-CommandOutput $result.Output)
+        if ($details.Count -gt 0) {
+            $details | Select-Object -Last 8 | ForEach-Object { Write-Log "  $_" 'Red' }
+        }
+        exit 1
+    }
+}
+
+function Test-AdminUserExists {
+    $checkSql = @"
+SET NOCOUNT ON;
+IF OBJECT_ID(N'dbo.users', N'U') IS NULL
+    SELECT 0;
+ELSE
+    EXEC sp_executesql N'IF EXISTS (SELECT 1 FROM dbo.users WHERE username = N''admin'') SELECT 1; ELSE SELECT 0;';
+"@
+
+    $rows = Invoke-SqlcmdChecked `
+        -Arguments ($sqlArgs + @('-d', $DbName, '-Q', $checkSql, '-h', '-1', '-W', '-b')) `
+        -FailureMessage 'Failed to inspect existing admin user.'
+
+    $value = @($rows | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ } | Select-Object -First 1)
+    return ($value -eq '1')
 }
 
 function Test-SaLogin([string[]]$Arguments) {
@@ -510,13 +610,18 @@ if (-not (Test-SaLogin $sqlArgs)) {
 }
 Write-Log "SQL 'sa' login verified." 'Green'
 
-$AdminPasswordHash = New-BcryptHash $AdminPassword
-
 # --- Step 4: Create database --------------------------------------------------
 Write-Log "=== Step 3: Creating database '$DbName' ===" 'Cyan'
 $createDb = "IF DB_ID('$DbName') IS NULL BEGIN CREATE DATABASE [$DbName]; END"
 Invoke-SqlcmdChecked -Arguments ($sqlArgs + @('-Q', $createDb, '-b')) -FailureMessage "Failed to create database '$DbName'." | Out-Null
 Write-Log "Database '$DbName' ready." 'Green'
+
+$adminUserExistedBeforeInit = Test-AdminUserExists
+if ($adminUserExistedBeforeInit) {
+    Write-Log "Existing admin user found before init scripts. Its password will be preserved." 'Gray'
+} else {
+    Write-Log "No existing admin user found before init scripts. Initial admin password will be '$DefaultAdminPassword'." 'Gray'
+}
 
 # --- Step 5: Run init scripts -------------------------------------------------
 Write-Log "=== Step 4: Init scripts ===" 'Cyan'
@@ -528,15 +633,25 @@ if (-not (Test-Path $InitScriptsDir)) {
 
     foreach ($f in $initFiles) {
         Write-Log "  Running $($f.Name) ..." 'Yellow'
-        Invoke-SqlcmdChecked -Arguments ($sqlArgs + @('-d', $DbName, '-i', $f.FullName, '-b')) -FailureMessage "Init script failed: $($f.Name)" | Out-Null
+        Invoke-SqlcmdFileChecked -Arguments ($sqlArgs + @('-d', $DbName)) -FilePath $f.FullName -FailureMessage "Init script failed: $($f.Name)"
         Write-Log "  [OK] $($f.Name)" 'Green'
     }
 }
 
-# --- Step 5b: Set installer-provided admin password ---------------------------
+# --- Step 5b: Prepare initial admin password ----------------------------------
 Write-Log "=== Step 4b: Admin user password ===" 'Cyan'
-$adminHashSql = $AdminPasswordHash.Replace("'", "''")
-$setAdminPasswordSql = @"
+if ($adminUserExistedBeforeInit) {
+    Write-Log "Admin user already existed before this install. Existing admin password was preserved." 'Green'
+} else {
+    $AdminPassword = Resolve-AdminPassword
+    if ([string]::IsNullOrWhiteSpace($AdminPassword)) {
+        Write-Log "ERROR: Initial admin password is required." 'Red'
+        exit 1
+    }
+    Write-Log "Initial admin password ready for hashing (length: $($AdminPassword.Length), sha256-12: $(Get-SecretFingerprint $AdminPassword))." 'Gray'
+    $AdminPasswordHash = New-BcryptHash $AdminPassword
+    $adminHashSql = $AdminPasswordHash.Replace("'", "''")
+    $setAdminPasswordSql = @"
 DECLARE @adminRoleId INT = (SELECT TOP 1 id FROM dbo.roles WHERE name = N'Administrador' ORDER BY id);
 
 IF @adminRoleId IS NOT NULL
@@ -585,17 +700,18 @@ BEGIN
 END
 "@
 
-Invoke-SqlcmdChecked -Arguments ($sqlArgs + @('-d', $DbName, '-Q', $setAdminPasswordSql, '-b')) -FailureMessage 'Failed to set admin user password.' | Out-Null
+    Invoke-SqlcmdChecked -Arguments ($sqlArgs + @('-d', $DbName, '-Q', $setAdminPasswordSql, '-b')) -FailureMessage 'Failed to set initial admin user password.' | Out-Null
 
-$storedAdminHashRows = Invoke-SqlcmdChecked `
-    -Arguments ($sqlArgs + @('-d', $DbName, '-Q', "SET NOCOUNT ON; SELECT password_hash FROM dbo.users WHERE username = N'admin';", '-h', '-1', '-W', '-b')) `
-    -FailureMessage 'Failed to verify admin user password.'
-$storedAdminHash = @($storedAdminHashRows | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ } | Select-Object -First 1)
-if (-not (Test-BcryptHash $AdminPassword $storedAdminHash)) {
-    Write-Log "ERROR: Admin user password was written, but bcrypt verification did not match." 'Red'
-    exit 1
+    $storedAdminHashRows = Invoke-SqlcmdChecked `
+        -Arguments ($sqlArgs + @('-d', $DbName, '-Q', "SET NOCOUNT ON; SELECT password_hash FROM dbo.users WHERE username = N'admin';", '-h', '-1', '-W', '-b')) `
+        -FailureMessage 'Failed to verify initial admin user password.'
+    $storedAdminHash = @($storedAdminHashRows | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ } | Select-Object -First 1)
+    if (-not (Test-BcryptHash $AdminPassword $storedAdminHash)) {
+        Write-Log "ERROR: Initial admin user password was written, but bcrypt verification did not match." 'Red'
+        exit 1
+    }
+    Write-Log "Initial admin user password ready and verified." 'Green'
 }
-Write-Log "Admin user password ready and verified." 'Green'
 
 # --- Step 6: Run migrations ---------------------------------------------------
 Write-Log "=== Step 5: Migrations ===" 'Cyan'

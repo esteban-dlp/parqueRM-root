@@ -112,6 +112,16 @@ function Format-CommandOutput([object[]]$Output) {
     } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 }
 
+function Test-SqlcmdUnsupportedOption([object[]]$Output, [string]$OptionName) {
+    $text = (@(Format-CommandOutput $Output) -join "`n")
+    if ([string]::IsNullOrWhiteSpace($text)) { return $false }
+
+    $escapedOption = [regex]::Escape($OptionName)
+    $optionFirstPattern = "(?i)(^|\s|:)[`"'\-]?$escapedOption[`"']?\s*:\s*unknown\s+(option|flag)"
+    $unknownFirstPattern = "(?i)unknown\s+(option|flag|shorthand\s+flag).*?[`"'\-]?$escapedOption\b"
+    return (($text -match $optionFirstPattern) -or ($text -match $unknownFirstPattern))
+}
+
 function Invoke-SqlcmdChecked {
     param(
         [string[]]$ExtraArgs,
@@ -121,7 +131,7 @@ function Invoke-SqlcmdChecked {
     $allArgs = @($sqlArgs + $ExtraArgs)
     $result = Invoke-NativeCommandCapture { & $SqlcmdPath @allArgs }
     if ($result.ExitCode -ne 0) {
-        $details = Format-CommandOutput $result.Output
+        $details = @(Format-CommandOutput $result.Output)
         if ($details.Count -gt 0) {
             throw "$FailureMessage`n$($details -join [Environment]::NewLine)"
         }
@@ -132,10 +142,23 @@ function Invoke-SqlcmdChecked {
 }
 
 function Invoke-Sqlcmd-File([string]$file) {
-    Invoke-SqlcmdChecked `
-        -ExtraArgs @('-i', $file, '-b') `
-        -FailureMessage "Migration failed: $(Split-Path $file -Leaf)." |
-        Out-Null
+    $fileName = Split-Path $file -Leaf
+    $argsWithUtf8 = @($sqlArgs + @('-f', '65001', '-i', $file, '-b'))
+    $result = Invoke-NativeCommandCapture { & $SqlcmdPath @argsWithUtf8 }
+
+    if ($result.ExitCode -ne 0 -and (Test-SqlcmdUnsupportedOption $result.Output 'f')) {
+        Write-Host "  [WARN] sqlcmd does not support -f 65001; retrying $fileName without the UTF-8 flag." -ForegroundColor Yellow
+        $argsDefaultEncoding = @($sqlArgs + @('-i', $file, '-b'))
+        $result = Invoke-NativeCommandCapture { & $SqlcmdPath @argsDefaultEncoding }
+    }
+
+    if ($result.ExitCode -ne 0) {
+        $details = @(Format-CommandOutput $result.Output)
+        if ($details.Count -gt 0) {
+            throw "Migration failed: $fileName.`n$($details -join [Environment]::NewLine)"
+        }
+        throw "Migration failed: $fileName."
+    }
 }
 
 function Invoke-Sqlcmd-Query([string]$query) {

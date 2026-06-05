@@ -72,6 +72,56 @@ function SafeRobocopy {
     robocopy $src $dst /E /NFL /NDL /NJH /NJS /XF '.gitkeep' | Out-Null
 }
 
+function Stop-NodeProcessesInDirectory {
+    param([string]$ProjectDir)
+
+    $projectPrefix = ([IO.Path]::GetFullPath($ProjectDir)).TrimEnd('\') + '\'
+    $nodeProcesses = @(
+        Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.CommandLine -and
+                $_.CommandLine.IndexOf($projectPrefix, [StringComparison]::OrdinalIgnoreCase) -ge 0
+            }
+    )
+
+    if ($nodeProcesses.Count -eq 0) { return }
+
+    foreach ($proc in $nodeProcesses) {
+        Log "  Stopping node.exe PID $($proc.ProcessId) using $ProjectDir" 'Yellow'
+        Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+
+    Start-Sleep -Seconds 3
+}
+
+function Invoke-NpmCiWithRetry {
+    param(
+        [string]$ProjectDir,
+        [string]$Label
+    )
+
+    Stop-NodeProcessesInDirectory $ProjectDir
+
+    for ($attempt = 1; $attempt -le 2; $attempt++) {
+        Log "  Running: npm ci --prefer-offline" 'Yellow'
+        npm ci --prefer-offline
+        if ($LASTEXITCODE -eq 0) {
+            Log '  [OK] npm ci' 'Green'
+            return
+        }
+
+        if ($attempt -lt 2) {
+            Log "  [WARN] npm ci failed for $Label. Retrying after closing local node.exe processes..." 'Yellow'
+            Stop-NodeProcessesInDirectory $ProjectDir
+            Start-Sleep -Seconds 5
+            continue
+        }
+
+        Log "[ERROR] npm ci failed for $Label" 'Red'
+        exit 1
+    }
+}
+
 # ---------------------------------------------------------------------------
 # Header
 # ---------------------------------------------------------------------------
@@ -199,10 +249,7 @@ if ($SkipNpmInstall) {
     Push-Location $BackendDir
     try {
         Log "  Working dir: $BackendDir" 'Gray'
-        Log '  Running: npm ci --prefer-offline' 'Yellow'
-        npm ci --prefer-offline
-        if ($LASTEXITCODE -ne 0) { Log '[ERROR] npm ci failed' 'Red'; exit 1 }
-        Log '  [OK] npm ci' 'Green'
+        Invoke-NpmCiWithRetry -ProjectDir $BackendDir -Label 'backend'
 
         Log '  Running: npm run build' 'Yellow'
         npm run build
@@ -230,10 +277,7 @@ if ($SkipNpmInstall) {
     Push-Location $FrontendDir
     try {
         Log "  Working dir: $FrontendDir" 'Gray'
-        Log '  Running: npm ci --prefer-offline' 'Yellow'
-        npm ci --prefer-offline
-        if ($LASTEXITCODE -ne 0) { Log '[ERROR] npm ci failed' 'Red'; exit 1 }
-        Log '  [OK] npm ci' 'Green'
+        Invoke-NpmCiWithRetry -ProjectDir $FrontendDir -Label 'frontend'
 
         Log '  Running: npm run build' 'Yellow'
         npm run build

@@ -361,7 +361,7 @@ BEGIN
     (
         1,
         N'admin',
-        N'$2b$12$.JFcotaaZqS6E/XbFow1Xuq0CdQVbEYRItqhm/FDI6cNVuTdmuX3e',
+        N'$2b$12$TXeaiaVB38WiRC.uZybYGOCVHtqKv6gzLRmCZEwcyuhHBH4iM6ZJu',
         N'Administrador del Sistema',
         N'admin@parquerm.local',
         1,

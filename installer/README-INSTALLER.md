@@ -65,7 +65,7 @@ The setup:
 
 1. Opens firewall rules for frontend/backend.
 2. Installs or reuses SQL Server Express.
-3. Initializes the database, sets/resets the `admin` password, and runs migrations.
+3. Initializes the database, prepares the initial `admin` password only when needed, and runs migrations.
 4. Generates backend/frontend configuration.
 5. Installs and starts Windows services.
 6. Validates frontend, backend health, and database health before reporting success.
@@ -108,7 +108,13 @@ The application login user is always:
 admin
 ```
 
-The installer asks for this user's password and stores only a bcrypt hash in SQL Server.
+On a fresh database, the initial password is:
+
+```text
+admin1
+```
+
+The installer no longer asks for this user's password. If the `admin` user already existed before the installer ran, its current password is preserved.
 
 ## Backups And Restore
 
