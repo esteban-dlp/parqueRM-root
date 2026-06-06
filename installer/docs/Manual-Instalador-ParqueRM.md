@@ -328,10 +328,10 @@ Hace lo siguiente:
 10. Crea la base `ParqueRM` si no existe.
 11. Ejecuta scripts `db\init`, excepto `01_create_database.sql` porque la base ya fue creada por el script.
 12. Detecta si el usuario `admin` ya existia antes de correr las seeds.
-13. Si `admin` ya existia, conserva su contrasena actual.
-14. Si `admin` no existia, genera hash bcrypt para la contrasena inicial `admin1`.
-15. Actualiza o inserta el usuario `admin` solo para la instalacion inicial.
-16. Verifica con bcrypt que `admin1` coincida con el hash guardado en instalaciones nuevas.
+13. Genera hash bcrypt para la contrasena inicial `admin1`.
+14. Actualiza o inserta el usuario `admin` con esa contrasena inicial.
+15. Verifica con bcrypt que `admin1` coincida con el hash guardado.
+16. Si la verificacion falla, aborta la instalacion.
 17. Ejecuta migraciones pendientes.
 18. Escribe `C:\ParqueRM\config\db-ready.json`.
 
@@ -555,13 +555,13 @@ El usuario de login web es:
 admin
 ```
 
-En una instalacion nueva, la contrasena inicial es:
+La contrasena configurada por el instalador es:
 
 ```text
 admin1
 ```
 
-El instalador ya no pide la contrasena de este usuario. Si `admin` ya existia antes de correr la inicializacion, conserva su contrasena actual.
+El instalador ya no pide la contrasena de este usuario. Durante la instalacion, escribe y verifica un hash bcrypt para `admin1`.
 
 Solo se guarda un hash bcrypt en:
 
@@ -573,13 +573,11 @@ No se guarda la contrasena en texto plano.
 
 El flujo actual:
 
-1. El instalador revisa si `dbo.users` ya tenia `username = N'admin'` antes de correr las seeds.
-2. Si ya existia, no cambia su hash.
-3. Si no existia, usa la contrasena inicial `admin1`.
-4. Genera un hash bcrypt usando Node.js y `bcrypt`.
-5. Actualiza o crea `dbo.users` con `username = N'admin'`.
-6. Lee el hash guardado.
-7. Verifica que `admin1` coincida con el hash guardado.
+1. El instalador usa la contrasena inicial `admin1`.
+2. Genera un hash bcrypt usando Node.js y `bcrypt`.
+3. Actualiza o crea `dbo.users` con `username = N'admin'`.
+4. Lee el hash guardado.
+5. Verifica que `admin1` coincida con el hash guardado.
 
 Si la verificacion falla, la instalacion debe fallar con log claro.
 
@@ -1217,8 +1215,8 @@ Invoke-WebRequest http://127.0.0.1/api/health/database -UseBasicParsing
 
 - [ ] Entregar instalador `.exe`.
 - [ ] Entregar usuario inicial: `admin`.
-- [ ] Aclarar que la contrasena inicial admin es `admin1` solo en instalaciones nuevas.
-- [ ] Aclarar que una reinstalacion conserva la contrasena admin existente.
+- [ ] Aclarar que el instalador configura la contrasena admin como `admin1`.
+- [ ] Aclarar que una reinstalacion tambien reconfigura `admin` como `admin1`.
 - [ ] Aclarar que la contrasena admin no se puede recuperar, solo resetear.
 - [ ] Recomendacion de IP fija o reserva DHCP.
 - [ ] Indicar ruta de backups: `C:\ParqueRM\backups`.
@@ -1265,8 +1263,8 @@ Por defecto:
 
 La contrasena web de `admin`:
 
-- En instalaciones nuevas inicia como `admin1`.
-- En reinstalaciones conserva la contrasena existente.
+- El instalador la configura como `admin1`.
+- En reinstalaciones tambien se reconfigura como `admin1`.
 - No se guarda en texto plano.
 - Se guarda como bcrypt.
 - No es recuperable.

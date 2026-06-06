@@ -108,13 +108,13 @@ The application login user is always:
 admin
 ```
 
-On a fresh database, the initial password is:
+The installer configures the `admin` password as:
 
 ```text
 admin1
 ```
 
-The installer no longer asks for this user's password. If the `admin` user already existed before the installer ran, its current password is preserved.
+The installer no longer asks for this user's password. During installation, it writes and verifies a bcrypt hash for `admin1`.
 
 ## Backups And Restore
 

@@ -617,8 +617,16 @@ Invoke-SqlcmdChecked -Arguments ($sqlArgs + @('-Q', $createDb, '-b')) -FailureMe
 Write-Log "Database '$DbName' ready." 'Green'
 
 $adminUserExistedBeforeInit = Test-AdminUserExists
+$adminPasswordExplicitlyProvided = (
+    -not [string]::IsNullOrWhiteSpace($AdminPasswordEnv) -or
+    -not [string]::IsNullOrEmpty($AdminPassword)
+)
 if ($adminUserExistedBeforeInit) {
-    Write-Log "Existing admin user found before init scripts. Its password will be preserved." 'Gray'
+    if ($adminPasswordExplicitlyProvided) {
+        Write-Log "Existing admin user found before init scripts. Its password will be reset to the installer-provided value." 'Gray'
+    } else {
+        Write-Log "Existing admin user found before init scripts. Its password will be preserved." 'Gray'
+    }
 } else {
     Write-Log "No existing admin user found before init scripts. Initial admin password will be '$DefaultAdminPassword'." 'Gray'
 }
@@ -640,7 +648,7 @@ if (-not (Test-Path $InitScriptsDir)) {
 
 # --- Step 5b: Prepare initial admin password ----------------------------------
 Write-Log "=== Step 4b: Admin user password ===" 'Cyan'
-if ($adminUserExistedBeforeInit) {
+if ($adminUserExistedBeforeInit -and -not $adminPasswordExplicitlyProvided) {
     Write-Log "Admin user already existed before this install. Existing admin password was preserved." 'Green'
 } else {
     $AdminPassword = Resolve-AdminPassword

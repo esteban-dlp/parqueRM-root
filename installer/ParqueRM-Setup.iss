@@ -249,8 +249,7 @@ begin
     'Credenciales iniciales de ParqueRM',
     'Usuario: admin' + #13#10 +
     'Contrasena inicial: {#DefaultAdminPassword}' + #13#10#13#10 +
-    'Si esta computadora ya tenia ParqueRM instalado, use la contrasena admin que ya tenia antes. ' +
-    'El instalador no cambiara la contrasena de un usuario admin existente.');
+    'Durante esta instalacion el usuario admin quedara configurado con estas credenciales.');
 
   { JWT secrets page -- pre-filled with random secrets }
   JwtPage := CreateInputQueryPage(AdminInfoPage.ID,
