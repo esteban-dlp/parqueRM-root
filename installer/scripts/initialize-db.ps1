@@ -47,6 +47,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $ExitCodeSqlPasswordRetry = 11
+$ExitCodeSqlRebootRequired = 12
 $DefaultAdminPassword = 'admin1'
 
 $ScriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
@@ -355,6 +356,176 @@ function Test-LocalSqlTcp {
     }
 }
 
+function Get-SystemDriveRoot {
+    $drive = $env:SystemDrive
+    if ([string]::IsNullOrWhiteSpace($drive)) { $drive = 'C:' }
+    return $drive.TrimEnd('\') + '\'
+}
+
+function Invoke-FsutilSectorInfo([string]$VolumeRoot) {
+    try {
+        $output = & fsutil fsinfo sectorinfo $VolumeRoot 2>&1
+        return @(Format-CommandOutput $output)
+    } catch {
+        return @("fsutil failed: $($_.Exception.Message)")
+    }
+}
+
+function Get-MaxPhysicalSectorBytes([string[]]$SectorInfoLines) {
+    $values = @()
+    foreach ($line in $SectorInfoLines) {
+        if ($line -match '(?i)(physical|fisic|f.sic|atomic|performance|rendimiento).*?:\s*(\d+)') {
+            $values += [int]$matches[2]
+        }
+    }
+
+    if ($values.Count -eq 0) { return 0 }
+    return ($values | Measure-Object -Maximum).Maximum
+}
+
+function Test-SqlSectorCompatibilityRegistryFixApplied {
+    $path = 'HKLM:\SYSTEM\CurrentControlSet\Services\stornvme\Parameters\Device'
+    if (-not (Test-Path $path)) { return $false }
+
+    try {
+        $props = Get-ItemProperty -Path $path -Name 'ForcedPhysicalSectorSizeInBytes' -ErrorAction Stop
+        $value = @($props.ForcedPhysicalSectorSizeInBytes)
+        return ($value -contains '* 4095')
+    } catch {
+        return $false
+    }
+}
+
+function Enable-SqlSectorCompatibilityIfNeeded {
+    $volume = Get-SystemDriveRoot
+    Write-Log "Checking disk sector compatibility for SQL Server on $volume ..." 'Cyan'
+    $sectorInfo = @(Invoke-FsutilSectorInfo $volume)
+    if ($sectorInfo.Count -gt 0) {
+        $sectorInfo | ForEach-Object { Add-Content -Path $LogFile -Value "  $_" }
+    }
+
+    $maxSectorBytes = Get-MaxPhysicalSectorBytes $sectorInfo
+    if ($maxSectorBytes -le 0) {
+        Write-Log "Could not parse physical sector size from fsutil output. Continuing without registry change." 'Yellow'
+        return
+    }
+
+    Write-Log "Detected max physical sector size: $maxSectorBytes bytes." 'Gray'
+    if ($maxSectorBytes -le 4096) {
+        Write-Log "Disk sector size is compatible with SQL Server." 'Green'
+        return
+    }
+
+    if (Test-SqlSectorCompatibilityRegistryFixApplied) {
+        Write-Log "SQL Server NVMe sector compatibility registry fix is already present." 'Green'
+        return
+    }
+
+    Write-Log "Detected physical sector size greater than 4096 bytes. Applying SQL Server NVMe compatibility registry fix..." 'Yellow'
+    $regPath = 'HKLM:\SYSTEM\CurrentControlSet\Services\stornvme\Parameters\Device'
+    if (-not (Test-Path $regPath)) {
+        New-Item -Path $regPath -Force | Out-Null
+    }
+    New-ItemProperty `
+        -Path $regPath `
+        -Name 'ForcedPhysicalSectorSizeInBytes' `
+        -PropertyType MultiString `
+        -Force `
+        -Value '* 4095' |
+        Out-Null
+
+    Write-Log "SQL Server NVMe sector compatibility registry fix applied." 'Green'
+    Write-Log "Windows must be restarted before SQL Server can be installed or started reliably." 'Yellow'
+    exit $ExitCodeSqlRebootRequired
+}
+
+function Write-RecentSqlErrorLogTail {
+    $logRoots = @(
+        'C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log',
+        'C:\Program Files\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\Log',
+        'C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\Log'
+    )
+
+    foreach ($root in $logRoots) {
+        if (-not (Test-Path $root)) { continue }
+        $files = @(Get-ChildItem -Path $root -Filter 'ERRORLOG*' -File -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 2)
+        foreach ($file in $files) {
+            Write-Log "SQL Server ERRORLOG tail: $($file.FullName)" 'Gray'
+            Get-Content -Path $file.FullName -Tail 80 -ErrorAction SilentlyContinue |
+                ForEach-Object { Add-Content -Path $LogFile -Value "  $_" }
+        }
+        return
+    }
+}
+
+function Find-SqlServerUpdatePackage {
+    $updatesDir = Join-Path $RuntimeCacheDir 'sqlserver-express\updates'
+    if (-not (Test-Path $updatesDir)) { return $null }
+
+    return Get-ChildItem -Path $updatesDir -Filter '*.exe' -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '(?i)(SQLServer.*KB|KB\d+|CU)' } |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+}
+
+function Invoke-SqlServerUpdateIfAvailable {
+    $updatePackage = Find-SqlServerUpdatePackage
+    if (-not $updatePackage) {
+        Write-Log "No SQL Server cumulative update package found in runtime\sqlserver-express\updates." 'Gray'
+        return
+    }
+
+    Write-Log "Applying SQL Server update package: $($updatePackage.FullName)" 'Yellow'
+    $patchArgs = Join-WindowsCommandLine @(
+        '/quiet',
+        '/IAcceptSQLServerLicenseTerms',
+        '/Action=Patch',
+        '/AllInstances'
+    )
+    $proc = Start-Process -FilePath $updatePackage.FullName -ArgumentList $patchArgs -Wait -PassThru
+    if ($proc.ExitCode -eq 0) {
+        Write-Log "SQL Server update package completed successfully." 'Green'
+        return
+    }
+    if ($proc.ExitCode -eq 3010 -or $proc.ExitCode -eq 1641) {
+        Write-Log "SQL Server update package completed and requires Windows restart (exit code $($proc.ExitCode))." 'Yellow'
+        exit $ExitCodeSqlRebootRequired
+    }
+
+    Write-Log "ERROR: SQL Server update package failed (exit code $($proc.ExitCode))." 'Red'
+    Write-RecentSqlErrorLogTail
+    exit 1
+}
+
+function Start-SqlServiceAndWait([string]$ServiceName) {
+    Write-Log "Starting SQL Server service $ServiceName..." 'Yellow'
+    try {
+        Start-Service $ServiceName -ErrorAction Stop
+    } catch {
+        Write-Log "ERROR: Could not start SQL Server service ${ServiceName}: $($_.Exception.Message)" 'Red'
+        Write-Log "       If this is a new NVMe/modern disk machine, check diagnostics for fsutil sector info and SQL ERRORLOG." 'Yellow'
+        Write-RecentSqlErrorLogTail
+        exit 1
+    }
+
+    $deadline = (Get-Date).AddSeconds(90)
+    do {
+        $svcNow = Get-Service -Name $ServiceName -ErrorAction Stop
+        if ($svcNow.Status -eq 'Running') {
+            Start-Sleep -Seconds 3
+            Write-Log "SQL Server service $ServiceName is running." 'Green'
+            return
+        }
+        Start-Sleep -Seconds 2
+    } while ((Get-Date) -lt $deadline)
+
+    Write-Log "ERROR: SQL Server service $ServiceName did not reach Running state." 'Red'
+    Write-RecentSqlErrorLogTail
+    exit 1
+}
+
 function Invoke-SqlcmdChecked {
     param(
         [string[]]$Arguments,
@@ -510,6 +681,10 @@ if (-not $sqlcmd) {
     foreach ($c in $candidates) { if (Test-Path $c) { $sqlcmd = $c; break } }
 }
 
+# --- Preflight: SQL Server disk sector compatibility --------------------------
+Write-Log "=== Preflight: SQL Server disk sector compatibility ===" 'Cyan'
+Enable-SqlSectorCompatibilityIfNeeded
+
 # --- Step 1: SQL Server Express install ---------------------------------------
 Write-Log "=== Step 1: SQL Server Express ===" 'Cyan'
 
@@ -535,6 +710,7 @@ if (-not $sqlServerInstalled -and -not $skipSqlInstallFlag) {
     }
 
     Write-Log "Installing SQL Server Express from $($sqlSetup.FullName) ..." 'Yellow'
+    $updatesDir = Join-Path $sqlExpressCache 'updates'
     $sqlSetupArgs = @(
         '/Q',
         '/ACTION=Install',
@@ -545,17 +721,32 @@ if (-not $sqlServerInstalled -and -not $skipSqlInstallFlag) {
         '/TCPENABLED=1',
         '/IACCEPTSQLSERVERLICENSETERMS'
     )
+    if (Test-Path $updatesDir) {
+        $updatePackages = @(Get-ChildItem -Path $updatesDir -Filter '*.exe' -File -ErrorAction SilentlyContinue)
+        if ($updatePackages.Count -gt 0) {
+            Write-Log "SQL Server setup will use update source: $updatesDir" 'Gray'
+            $sqlSetupArgs += '/UPDATEENABLED=True'
+            $sqlSetupArgs += "/UPDATESOURCE=$updatesDir"
+        }
+    }
     $sqlArgs = Join-WindowsCommandLine $sqlSetupArgs
     $proc = Start-Process -FilePath $sqlSetup.FullName -ArgumentList $sqlArgs -Wait -PassThru
     if ($proc.ExitCode -ne 0 -and $proc.ExitCode -ne 3010) {
         Write-Log "SQL Server installation failed (exit code $($proc.ExitCode))." 'Red'
         Write-Log "This can happen when SQL Server rejects the provided 'sa' password. The installer should ask for a different SQL password and retry." 'Yellow'
+        Write-RecentSqlErrorLogTail
         exit $ExitCodeSqlPasswordRetry
     }
     Write-Log "SQL Server Express installed successfully." 'Green'
     if ($proc.ExitCode -eq 3010) {
-        Write-Log "WARNING: Reboot required to complete SQL Server installation." 'Yellow'
+        Write-Log "SQL Server installation requires Windows restart." 'Yellow'
+        exit $ExitCodeSqlRebootRequired
     }
+}
+
+$engineServices = @(Get-SqlEngineServices)
+if ($engineServices.Count -gt 0) {
+    Invoke-SqlServerUpdateIfAvailable
 }
 
 # --- Step 2: Ensure SQL Server service is running -----------------------------
@@ -570,11 +761,10 @@ $sqlServiceName = $svc.Name
 $sqlInstanceName = Get-SqlInstanceName $sqlServiceName
 Write-Log "Using SQL Server service: $sqlServiceName (instance: $sqlInstanceName)" 'Gray'
 if ($svc.Status -ne 'Running') {
-    Write-Log "Starting SQL Server service $sqlServiceName..." 'Yellow'
-    Start-Service $sqlServiceName
-    Start-Sleep -Seconds 5
+    Start-SqlServiceAndWait $sqlServiceName
+} else {
+    Write-Log "SQL Server service is running." 'Green'
 }
-Write-Log "SQL Server service is running." 'Green'
 
 # --- Step 3: Ensure sqlcmd available -----------------------------------------
 if (-not $sqlcmd) {

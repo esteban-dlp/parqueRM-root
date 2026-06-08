@@ -38,6 +38,23 @@ foreach ($port in 80,3000,1433) {
         Add-Content -Path $report
 }
 
+Write-Section $report 'Disk Sector Info'
+try {
+    fsutil fsinfo sectorinfo C: 2>&1 | Out-String | Add-Content -Path $report
+} catch {
+    "fsutil failed: $($_.Exception.Message)" | Add-Content -Path $report
+}
+
+Write-Section $report 'SQL NVMe Sector Registry Fix'
+try {
+    Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\stornvme\Parameters\Device' -Name 'ForcedPhysicalSectorSizeInBytes' |
+        Format-List |
+        Out-String |
+        Add-Content -Path $report
+} catch {
+    'ForcedPhysicalSectorSizeInBytes registry value not found.' | Add-Content -Path $report
+}
+
 Write-Section $report 'HTTP Health'
 foreach ($url in 'http://127.0.0.1/', 'http://127.0.0.1/api/health', 'http://127.0.0.1/api/health/database') {
     try {
@@ -76,6 +93,42 @@ if ($dbLog) {
     Get-Content $dbLog.FullName -Tail 200 | Add-Content -Path $report
 } else {
     'No db-init logs found.' | Add-Content -Path $report
+}
+
+Write-Section $report 'SQL Server ERRORLOG'
+$sqlLogRoots = @(
+    'C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log',
+    'C:\Program Files\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\Log',
+    'C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\Log'
+)
+foreach ($root in $sqlLogRoots) {
+    if (-not (Test-Path $root)) { continue }
+    Get-ChildItem -Path $root -Filter 'ERRORLOG*' -File |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 3 |
+        ForEach-Object {
+            "File: $($_.FullName)" | Add-Content -Path $report
+            Get-Content $_.FullName -Tail 160 | Add-Content -Path $report
+            Copy-Item -Path $_.FullName -Destination (Join-Path $outDir $_.Name) -Force
+        }
+    break
+}
+
+Write-Section $report 'SQL Setup Bootstrap Logs'
+$setupLogRoot = 'C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Log'
+if (Test-Path $setupLogRoot) {
+    Get-ChildItem -Path $setupLogRoot -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -in @('Summary.txt', 'Detail.txt') -or $_.Name -like '*.log' } |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 8 |
+        ForEach-Object {
+            "File: $($_.FullName)" | Add-Content -Path $report
+            Get-Content $_.FullName -Tail 120 -ErrorAction SilentlyContinue | Add-Content -Path $report
+            $safeName = ($_.FullName -replace '^[A-Za-z]:\\', '' -replace '[\\/:*?"<>|]', '_')
+            Copy-Item -Path $_.FullName -Destination (Join-Path $outDir $safeName) -Force -ErrorAction SilentlyContinue
+        }
+} else {
+    "SQL setup log root not found: $setupLogRoot" | Add-Content -Path $report
 }
 
 Write-Section $report 'Latest Backend Logs'

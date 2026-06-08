@@ -453,6 +453,10 @@ begin
   if ExitCode = -1 then
     msg := 'No se pudo ejecutar el paso: ' + StepName + #13#10 +
       'Revise permisos de administrador y archivos de instalacion.'
+  else if ExitCode = 12 then
+    msg := 'SQL Server necesita reiniciar Windows antes de continuar.' + #13#10 +
+      'El instalador aplico una correccion/actualizacion necesaria para SQL Server.' + #13#10#13#10 +
+      'Reinicie la computadora y ejecute nuevamente el instalador de ParqueRM.'
   else
     msg := 'La instalacion de ParqueRM no pudo completar el paso:' + #13#10 +
       StepName + #13#10#13#10 +
@@ -723,9 +727,10 @@ begin
       '  if($running.Count -eq 0){ break }' +
       '  Start-Sleep -Milliseconds 500' +
       '} while((Get-Date) -lt $deadline);' +
+      'Unregister-ScheduledTask -TaskName ''ParqueRM_IpCheck'' -Confirm:$false -ErrorAction SilentlyContinue;' +
       '$prefix=([IO.Path]::GetFullPath($install)).TrimEnd(''\'') + ''\'';' +
       '$procs=Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {' +
-      '  ($_.Name -in @(''node.exe'',''caddy.exe'',''ParqueRMBackend.exe'',''ParqueRMFrontend.exe'')) -and' +
+      '  ($_.Name -in @(''node.exe'',''caddy.exe'',''ParqueRMBackend.exe'',''ParqueRMFrontend.exe'',''WinSW.exe'',''WinSW-x64.exe'')) -and' +
       '  (($_.ExecutablePath -and [IO.Path]::GetFullPath($_.ExecutablePath).StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)) -or' +
       '   ($_.CommandLine -and $_.CommandLine.IndexOf($prefix,[StringComparison]::OrdinalIgnoreCase) -ge 0))' +
       '};' +

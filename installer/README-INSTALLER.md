@@ -26,6 +26,7 @@ Place these files under `installer\runtime-cache\` before building:
 | Folder | Required file |
 |--------|---------------|
 | `sqlserver-express` | `SQLEXPR_x64_ENU.exe` or similar |
+| `sqlserver-express\updates` | Optional SQL Server 2022 CU package, for example `SQLServer2022-KBxxxxxxx-x64.exe` |
 | `node` | `node.exe` |
 | `caddy` | `caddy.exe` |
 | `winsw` | `WinSW.exe` or `WinSW-x64.exe` |

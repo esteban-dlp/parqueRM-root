@@ -191,6 +191,25 @@ if ($SkipRuntimeValidation) {
         Log 'Run with -SkipRuntimeValidation to build without them.' 'Yellow'
         exit 1
     }
+
+    $sqlSetup = Get-ChildItem (Join-Path $RuntimeCache 'sqlserver-express') -Filter 'SQLEXPR*.exe' -File -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if ($sqlSetup) {
+        $sqlVersion = $sqlSetup.VersionInfo.FileVersion
+        Log "  [INFO] SQL Server Express setup: $($sqlSetup.Name) ($sqlVersion)" 'Gray'
+    }
+
+    $sqlUpdatesDir = Join-Path $RuntimeCache 'sqlserver-express\updates'
+    $sqlUpdates = @()
+    if (Test-Path $sqlUpdatesDir) {
+        $sqlUpdates = @(Get-ChildItem $sqlUpdatesDir -Filter '*.exe' -File -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending)
+    }
+    if ($sqlUpdates.Count -gt 0) {
+        Log "  [OK] SQL Server update package: $($sqlUpdates[0].Name)" 'Green'
+    } else {
+        Log '  [WARN] No SQL Server CU package found in runtime-cache\sqlserver-express\updates' 'Yellow'
+    }
 }
 
 # ---------------------------------------------------------------------------
