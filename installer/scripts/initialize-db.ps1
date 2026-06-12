@@ -499,6 +499,93 @@ function Find-SqlServerUpdatePackage {
         Select-Object -First 1
 }
 
+function ConvertTo-VersionOrNull([string]$Value) {
+    if ([string]::IsNullOrWhiteSpace($Value)) { return $null }
+    try {
+        return [version]$Value
+    } catch {
+        return $null
+    }
+}
+
+function Get-InstalledSqlEngineVersions {
+    $versions = @()
+    foreach ($service in @(Get-SqlEngineServices)) {
+        $instanceName = Get-SqlInstanceName $service.Name
+        $instanceId = Get-SqlInstanceRegistryId $instanceName
+        if ([string]::IsNullOrWhiteSpace($instanceId)) { continue }
+
+        $setupPath = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$instanceId\Setup"
+        if (-not (Test-Path $setupPath)) { continue }
+
+        try {
+            $props = Get-ItemProperty -Path $setupPath -ErrorAction Stop
+            foreach ($propName in @('PatchLevel', 'Version')) {
+                $version = ConvertTo-VersionOrNull ([string]$props.$propName)
+                if ($null -ne $version) { $versions += $version }
+            }
+        } catch {
+            continue
+        }
+    }
+
+    return @($versions | Sort-Object -Descending -Unique)
+}
+
+function Get-LatestSqlSetupSummary([datetime]$Since) {
+    $setupLogRoot = Join-Path ${env:ProgramFiles} 'Microsoft SQL Server\160\Setup Bootstrap\Log'
+    if (-not (Test-Path $setupLogRoot)) { return $null }
+
+    $summaryFiles = @(Get-ChildItem -Path $setupLogRoot -Filter 'Summary.txt' -File -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -ge $Since.AddMinutes(-5) } |
+        Sort-Object LastWriteTime -Descending)
+
+    if ($summaryFiles.Count -eq 0) { return $null }
+    return $summaryFiles[0]
+}
+
+function Get-SqlEngineVersionsFromSetupSummary([string]$Summary) {
+    $versions = @()
+    $featureBlock = $Summary
+    if ($Summary -match '(?s)Product features discovered:(.*?)Package properties:') {
+        $featureBlock = $matches[1]
+    }
+
+    foreach ($match in [regex]::Matches($featureBlock, '\b\d+\.\d+\.\d+\.\d+\b')) {
+        $version = ConvertTo-VersionOrNull $match.Value
+        if ($null -ne $version) { $versions += $version }
+    }
+
+    return @($versions | Sort-Object -Descending -Unique)
+}
+
+function Test-SqlUpdateNoopAlreadyApplied([int]$ExitCode, [datetime]$StartedAt) {
+    if ($ExitCode -ne -2042429437) { return $false }
+
+    $summaryFile = Get-LatestSqlSetupSummary $StartedAt
+    if (-not $summaryFile) { return $false }
+
+    $summary = Get-Content -Path $summaryFile.FullName -Raw -ErrorAction SilentlyContinue
+    if ([string]::IsNullOrWhiteSpace($summary)) { return $false }
+    if ($summary -notmatch 'No features were updated during the setup execution') { return $false }
+
+    $patchLevel = $null
+    if ($summary -match '(?m)^\s*PatchLevel:\s*(\d+\.\d+\.\d+\.\d+)\s*$') {
+        $patchLevel = ConvertTo-VersionOrNull $matches[1]
+    }
+    if ($null -eq $patchLevel) { return $false }
+
+    $installedVersions = @(
+        Get-InstalledSqlEngineVersions
+        Get-SqlEngineVersionsFromSetupSummary $summary
+    ) | Sort-Object -Descending -Unique
+    $matchingVersion = $installedVersions | Where-Object { $_ -ge $patchLevel } | Select-Object -First 1
+    if ($null -eq $matchingVersion) { return $false }
+
+    Write-Log "SQL Server update package reported no features to update; installed SQL version $matchingVersion is already at or above patch level $patchLevel. Continuing." 'Green'
+    return $true
+}
+
 function Invoke-SqlServerUpdateIfAvailable {
     $updatePackage = Find-SqlServerUpdatePackage
     if (-not $updatePackage) {
@@ -513,6 +600,7 @@ function Invoke-SqlServerUpdateIfAvailable {
         '/Action=Patch',
         '/AllInstances'
     )
+    $startedAt = Get-Date
     $proc = Start-Process -FilePath $updatePackage.FullName -ArgumentList $patchArgs -Wait -PassThru
     if ($proc.ExitCode -eq 0) {
         Write-Log "SQL Server update package completed successfully." 'Green'
@@ -521,6 +609,9 @@ function Invoke-SqlServerUpdateIfAvailable {
     if ($proc.ExitCode -eq 3010 -or $proc.ExitCode -eq 1641) {
         Write-Log "SQL Server update package completed and requires Windows restart (exit code $($proc.ExitCode))." 'Yellow'
         exit $ExitCodeSqlRebootRequired
+    }
+    if (Test-SqlUpdateNoopAlreadyApplied $proc.ExitCode $startedAt) {
+        return
     }
 
     Write-Log "ERROR: SQL Server update package failed (exit code $($proc.ExitCode))." 'Red'

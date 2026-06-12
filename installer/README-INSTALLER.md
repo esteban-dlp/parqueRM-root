@@ -5,7 +5,7 @@ This folder builds the single offline Windows installer for ParqueRM.
 The output is one versioned executable:
 
 ```bat
-parqueRM-root\release\ParqueRM-Setup-v1.0.2.exe
+parqueRM-root\release\ParqueRM-Setup-v1.0.3.exe
 ```
 
 There is no separate updater. Run the same setup executable on a clean machine or over an existing ParqueRM installation.

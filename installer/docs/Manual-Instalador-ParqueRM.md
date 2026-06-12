@@ -3,7 +3,7 @@
 Documento tecnico y operativo para construir, instalar, diagnosticar y mantener ParqueRM en Windows.
 
 Fecha de referencia: 2026-06-12  
-Version objetivo del instalador: 1.0.2  
+Version objetivo del instalador: 1.0.3  
 Ruta del instalador en el repo: `parqueRM-root/installer`  
 Ruta por defecto en equipos instalados: `C:\ParqueRM`
 
@@ -244,7 +244,7 @@ El script `build-installer.ps1` ejecuta nueve pasos:
 El resultado esperado es:
 
 ```text
-parqueRM-root\release\ParqueRM-Setup-v1.0.2.exe
+parqueRM-root\release\ParqueRM-Setup-v1.0.3.exe
 ```
 
 La version depende de `version.json`.

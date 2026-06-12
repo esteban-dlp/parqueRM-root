@@ -220,7 +220,7 @@ Step 'Step 3/9 -- Version'
 $versionFile = Join-Path $RootDir 'version.json'
 if (-not (Test-Path $versionFile)) {
     Log '  [WARN] version.json not found -- using defaults' 'Yellow'
-    $ver = [PSCustomObject]@{ appName = 'ParqueRM'; version = '1.0.2' }
+    $ver = [PSCustomObject]@{ appName = 'ParqueRM'; version = '1.0.3' }
 } else {
     $ver = Get-Content $versionFile -Raw | ConvertFrom-Json
 }

@@ -3,7 +3,7 @@
 ; Inno Setup 6 script -- ParqueRM production installer
 ;
 ; Defines passed from build-installer.ps1:
-;   /DAppVersion=1.0.2
+;   /DAppVersion=1.0.3
 ;   /DBuildNumber=202501011200
 ;   /DReleaseDir=C:\...\parqueRM-root\release
 ;
@@ -13,7 +13,7 @@
 ; ============================================================
 
 #ifndef AppVersion
-  #define AppVersion "1.0.2"
+  #define AppVersion "1.0.3"
 #endif
 #ifndef BuildNumber
   #define BuildNumber "dev"
