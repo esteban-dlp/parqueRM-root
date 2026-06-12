@@ -1,0 +1,2112 @@
+﻿ParqueRM Diagnostics - 2026-06-09 16:19:31
+InstallDir: C:\ParqueRM
+
+================================================================================
+Services
+================================================================================
+
+ Status Name        DisplayName             
+ ------ ----        -----------             
+Stopped MSSQLSERVER SQL Server (MSSQLSERVER)
+
+
+
+
+================================================================================
+Ports
+================================================================================
+Port 80: False
+Port 3000: False
+Port 1433: False
+
+================================================================================
+Disk Sector Info
+================================================================================
+BytesLógicosPorSector:                                 512
+BytesFísicosPorSectorParaAtomicidad:                    4096
+BytesFísicosPorSectorParaRendimiento:                  16384
+BytesFísicosPorSectorParaAtomicidadEfectivosDeSistemaDeArchivos: 4096
+Alineación del dispositivo:                                      Alineado (0x000)
+Alineación de partición en el dispositivo:                         Alineado (0x000)
+Sin penalización de búsqueda
+Recorte admitido
+Incompatible con DAX
+Sin aprovisionamiento fino
+
+
+================================================================================
+SQL NVMe Sector Registry Fix
+================================================================================
+
+
+================================================================================
+HTTP Health
+================================================================================
+http://127.0.0.1/ -> ERROR: No es posible conectar con el servidor remoto
+http://127.0.0.1/api/health -> ERROR: No es posible conectar con el servidor remoto
+http://127.0.0.1/api/health/database -> ERROR: No es posible conectar con el servidor remoto
+
+================================================================================
+Config
+================================================================================
+Missing: C:\ParqueRM\config\parquerm.config.json
+
+================================================================================
+Backend .env (secrets redacted)
+================================================================================
+Missing: C:\ParqueRM\app\backend\.env
+
+================================================================================
+Latest DB Init Log
+================================================================================
+File: C:\ParqueRM\logs\db-init\db-init-20260609-161603.log
+[16:16:03] === Preflight: SQL Server disk sector compatibility ===
+[16:16:03] Checking disk sector compatibility for SQL Server on C:\ ...
+  Error 3: El sistema no puede encontrar la ruta especificada.
+[16:16:03] Could not parse physical sector size from fsutil output. Continuing without registry change.
+[16:16:03] === Step 1: SQL Server Express ===
+[16:16:03] SQL Server already installed: MSSQLSERVER
+[16:16:03] Applying SQL Server update package: C:\ParqueRM\runtime\sqlserver-express\updates\SQLServer2022-KB5081477-x64.exe
+[16:19:30] ERROR: SQL Server update package failed (exit code -2061893606).
+[16:19:30] SQL Server ERRORLOG tail: C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG
+  2026-06-09 16:19:14.15 Server      Microsoft SQL Server 2022 (RTM-CU25) (KB5081477) - 16.0.4255.1 (X64) 
+  	Apr 23 2026 22:38:54 
+  	Copyright (C) 2022 Microsoft Corporation
+  	Express Edition (64-bit) on Windows 10 Home Single Language 10.0 <X64> (Build 26200: )
+  
+  2026-06-09 16:19:14.18 Server      UTC adjustment: -6:00
+  2026-06-09 16:19:14.18 Server      (c) Microsoft Corporation.
+  2026-06-09 16:19:14.18 Server      All rights reserved.
+  2026-06-09 16:19:14.18 Server      Server process ID is 3712.
+  2026-06-09 16:19:14.18 Server      System Manufacturer: 'HP', System Model: 'HP Pavilion Laptop 15-eh0xxx'.
+  2026-06-09 16:19:14.18 Server      Authentication mode is MIXED.
+  2026-06-09 16:19:14.18 Server      Logging SQL Server messages in file 'C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG'.
+  2026-06-09 16:19:14.18 Server      The service account is 'NT Service\MSSQLSERVER'. This is an informational message; no user action is required.
+  2026-06-09 16:19:14.18 Server      Registry startup parameters: 
+  	 -d C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\master.mdf
+  	 -e C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG
+  	 -l C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\mastlog.ldf
+  2026-06-09 16:19:14.18 Server      Command Line Startup Parameters:
+  	 -s "MSSQLSERVER"
+  	 -m "SqlSetup"
+  	 -T 4022
+  	 -T 4010
+  	 -T 1905
+  	 -T 3701
+  	 -T 8015
+  2026-06-09 16:19:14.18 Server      SQL Server detected 1 sockets with 6 cores per socket and 6 logical processors per socket, 6 total logical processors; using 4 logical processors based on SQL Server licensing. This is an informational message; no user action is required.
+  2026-06-09 16:19:14.18 Server      SQL Server is starting at normal priority base (=7). This is an informational message only. No user action is required.
+  2026-06-09 16:19:14.18 Server      Detected 7541 MB of RAM, 1627 MB of available memory, 2584 MB of available page file. This is an informational message; no user action is required.
+  2026-06-09 16:19:14.18 Server      Using conventional memory in the memory manager.
+  2026-06-09 16:19:14.18 Server      Detected pause instruction latency: 71 cycles.
+  2026-06-09 16:19:14.18 Server      SQL Server detected the following NUMA node configuration (NUMA Node number 0, Processor Group number 0, CPU Mask 0x000000000000003f).
+  2026-06-09 16:19:14.19 Server      Page exclusion bitmap is enabled.
+  2026-06-09 16:19:14.22 Server      Buffer Pool: Allocating 4194304 bytes for 404531 hashPages.
+  2026-06-09 16:19:14.22 Server      Default collation: SQL_Latin1_General_CP1_CI_AS (us_english 1033)
+  2026-06-09 16:19:14.27 Server      Buffer pool extension is already disabled. No action is necessary.
+  2026-06-09 16:19:14.33 Server      CPU vectorization level(s) detected:  SSE SSE2 SSE3 SSSE3 SSE41 SSE42 AVX AVX2 POPCNT BMI1 BMI2
+  2026-06-09 16:19:14.34 Server      Perfmon counters for resource governor pools and groups failed to initialize and are disabled.
+  2026-06-09 16:19:14.37 Server      Query Store settings initialized with enabled = 1, 
+  2026-06-09 16:19:14.37 Server      The maximum number of dedicated administrator connections for this instance is '1'
+  2026-06-09 16:19:14.37 Server      This instance of SQL Server last reported using a process ID of 14352 at 9/06/2026 16:19:11 (local) 9/06/2026 22:19:11 (UTC). This is an informational message only; no user action is required.
+  2026-06-09 16:19:14.37 Server      Node configuration: node 0: CPU mask: 0x000000000000000f:0 Active CPU mask: 0x000000000000000f:0. This message provides a description of the NUMA configuration for this computer. This is an informational message only. No user action is required.
+  2026-06-09 16:19:14.38 Server      Using dynamic lock allocation.  Initial allocation of 2500 Lock blocks and 5000 Lock Owner blocks per node.  This is an informational message only.  No user action is required.
+  2026-06-09 16:19:14.39 Server      In-Memory OLTP initialized on lowend machine.
+  2026-06-09 16:19:14.41 Server      [INFO] Created Extended Events session 'hkenginexesession'
+  2026-06-09 16:19:14.41 Server      Database Instant File Initialization: disabled. For security and performance considerations see the topic 'Database Instant File Initialization' in SQL Server Books Online. This is an informational message only. No user action is required.
+  2026-06-09 16:19:14.41 Server      Total Log Writer threads: 2. This is an informational message; no user action is required.
+  2026-06-09 16:19:14.41 Server      Database Mirroring Transport is disabled in the endpoint configuration.
+  2026-06-09 16:19:14.41 Server      clwb is selected for pmem flush operation.
+  2026-06-09 16:19:14.41 spid20s     Warning ******************
+  2026-06-09 16:19:14.41 spid20s     SQL Server started in single-user mode. This an informational message only. No user action is required.
+  2026-06-09 16:19:14.42 Server      Software Usage Metrics is disabled.
+  2026-06-09 16:19:14.42 spid20s     Starting up database 'master'.
+  2026-06-09 16:19:14.44 spid20s     There have been 256 misaligned log IOs which required falling back to synchronous IO.  The current IO is on file C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\master.mdf.
+  2026-06-09 16:19:14.45 spid20s     Unable to create stack dump file due to stack shortage (ex_terminator - Last chance exception handling)
+  2026-06-09 16:19:14.45 spid20s     Stack Signature for the dump is 0x0000000000000000
+  2026-06-09 16:19:14.45 spid20s     SaveNumaNodeRelationShip : 0 of 1 numa nodes info saved to pDump.
+  2026-06-09 16:19:14.45 spid20s     CDmpClient::ExecuteAllCallbacks started.
+  2026-06-09 16:19:14.45 spid20s     XE_DumpCallbacks is executing...
+  2026-06-09 16:19:14.48 spid20s     DumpCallbackSOS is executing...
+  2026-06-09 16:19:14.48 spid20s     DumpCallbackEE is executing...
+  2026-06-09 16:19:14.48 spid20s     DumpCallbackSE is executing...
+  2026-06-09 16:19:14.48 spid20s     DumpCallbackSEAM is executing...
+  2026-06-09 16:19:14.48 spid20s     DumpCallbackSSB is executing...
+  2026-06-09 16:19:14.52 spid20s     DumpCallbackQE is executing...
+  2026-06-09 16:19:14.52 spid20s     DumpCallbackFullText is executing...
+  2026-06-09 16:19:14.52 spid20s     DumpCallbackSQLCLR is executing...
+  2026-06-09 16:19:14.52 spid20s     DumpCallbackHk is executing...
+  2026-06-09 16:19:14.53 spid20s     DumpCallbackRepl is executing...
+  2026-06-09 16:19:14.53 spid20s     DumpCallbackPolyBase is executing...
+  2026-06-09 16:19:14.53 spid20s     CDmpClient::ExecuteAllCallbacks completed. Time elapsed: 0 seconds.
+  2026-06-09 16:19:14.90 Server      External governance manager initialized
+  2026-06-09 16:19:16.20 spid20s     External dump process return code 0x20000001.
+  External dump process returned no errors.
+  
+[16:19:30] SQL Server ERRORLOG tail: C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG.1
+  2026-06-09 16:19:11.61 Server      Microsoft SQL Server 2022 (RTM-CU25) (KB5081477) - 16.0.4255.1 (X64) 
+  	Apr 23 2026 22:38:54 
+  	Copyright (C) 2022 Microsoft Corporation
+  	Express Edition (64-bit) on Windows 10 Home Single Language 10.0 <X64> (Build 26200: )
+  
+  2026-06-09 16:19:11.64 Server      UTC adjustment: -6:00
+  2026-06-09 16:19:11.64 Server      (c) Microsoft Corporation.
+  2026-06-09 16:19:11.64 Server      All rights reserved.
+  2026-06-09 16:19:11.64 Server      Server process ID is 14352.
+  2026-06-09 16:19:11.64 Server      System Manufacturer: 'HP', System Model: 'HP Pavilion Laptop 15-eh0xxx'.
+  2026-06-09 16:19:11.64 Server      Authentication mode is MIXED.
+  2026-06-09 16:19:11.64 Server      Logging SQL Server messages in file 'C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG'.
+  2026-06-09 16:19:11.64 Server      The service account is 'NT Service\MSSQLSERVER'. This is an informational message; no user action is required.
+  2026-06-09 16:19:11.64 Server      Registry startup parameters: 
+  	 -d C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\master.mdf
+  	 -e C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG
+  	 -l C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\mastlog.ldf
+  2026-06-09 16:19:11.64 Server      Command Line Startup Parameters:
+  	 -s "MSSQLSERVER"
+  	 -m "SqlSetup"
+  	 -T 4022
+  	 -T 4010
+  	 -T 1905
+  	 -T 3701
+  	 -T 8015
+  2026-06-09 16:19:11.64 Server      SQL Server detected 1 sockets with 6 cores per socket and 6 logical processors per socket, 6 total logical processors; using 4 logical processors based on SQL Server licensing. This is an informational message; no user action is required.
+  2026-06-09 16:19:11.64 Server      SQL Server is starting at normal priority base (=7). This is an informational message only. No user action is required.
+  2026-06-09 16:19:11.65 Server      Detected 7541 MB of RAM, 1613 MB of available memory, 2570 MB of available page file. This is an informational message; no user action is required.
+  2026-06-09 16:19:11.65 Server      Using conventional memory in the memory manager.
+  2026-06-09 16:19:11.65 Server      Detected pause instruction latency: 71 cycles.
+  2026-06-09 16:19:11.65 Server      SQL Server detected the following NUMA node configuration (NUMA Node number 0, Processor Group number 0, CPU Mask 0x000000000000003f).
+  2026-06-09 16:19:11.65 Server      Page exclusion bitmap is enabled.
+  2026-06-09 16:19:11.70 Server      Buffer Pool: Allocating 4194304 bytes for 402226 hashPages.
+  2026-06-09 16:19:11.71 Server      Default collation: SQL_Latin1_General_CP1_CI_AS (us_english 1033)
+  2026-06-09 16:19:11.74 Server      Buffer pool extension is already disabled. No action is necessary.
+  2026-06-09 16:19:11.80 Server      CPU vectorization level(s) detected:  SSE SSE2 SSE3 SSSE3 SSE41 SSE42 AVX AVX2 POPCNT BMI1 BMI2
+  2026-06-09 16:19:11.81 Server      Perfmon counters for resource governor pools and groups failed to initialize and are disabled.
+  2026-06-09 16:19:11.84 Server      Query Store settings initialized with enabled = 1, 
+  2026-06-09 16:19:11.84 Server      The maximum number of dedicated administrator connections for this instance is '1'
+  2026-06-09 16:19:11.84 Server      This instance of SQL Server last reported using a process ID of 19904 at 9/06/2026 16:19:06 (local) 9/06/2026 22:19:06 (UTC). This is an informational message only; no user action is required.
+  2026-06-09 16:19:11.84 Server      Node configuration: node 0: CPU mask: 0x000000000000000f:0 Active CPU mask: 0x000000000000000f:0. This message provides a description of the NUMA configuration for this computer. This is an informational message only. No user action is required.
+  2026-06-09 16:19:11.85 Server      Using dynamic lock allocation.  Initial allocation of 2500 Lock blocks and 5000 Lock Owner blocks per node.  This is an informational message only.  No user action is required.
+  2026-06-09 16:19:11.86 Server      In-Memory OLTP initialized on lowend machine.
+  2026-06-09 16:19:11.89 Server      [INFO] Created Extended Events session 'hkenginexesession'
+  2026-06-09 16:19:11.89 Server      Database Instant File Initialization: disabled. For security and performance considerations see the topic 'Database Instant File Initialization' in SQL Server Books Online. This is an informational message only. No user action is required.
+  2026-06-09 16:19:11.89 Server      Total Log Writer threads: 2. This is an informational message; no user action is required.
+  2026-06-09 16:19:11.91 Server      Database Mirroring Transport is disabled in the endpoint configuration.
+  2026-06-09 16:19:11.91 spid19s     Warning ******************
+  2026-06-09 16:19:11.91 Server      clwb is selected for pmem flush operation.
+  2026-06-09 16:19:11.91 spid19s     SQL Server started in single-user mode. This an informational message only. No user action is required.
+  2026-06-09 16:19:11.91 Server      Software Usage Metrics is disabled.
+  2026-06-09 16:19:11.92 spid19s     Starting up database 'master'.
+  2026-06-09 16:19:11.94 spid19s     There have been 256 misaligned log IOs which required falling back to synchronous IO.  The current IO is on file C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\master.mdf.
+  2026-06-09 16:19:11.94 spid19s     Unable to create stack dump file due to stack shortage (ex_terminator - Last chance exception handling)
+  2026-06-09 16:19:11.94 spid19s     Stack Signature for the dump is 0x0000000000000000
+  2026-06-09 16:19:11.94 spid19s     SaveNumaNodeRelationShip : 0 of 1 numa nodes info saved to pDump.
+  2026-06-09 16:19:11.94 spid19s     CDmpClient::ExecuteAllCallbacks started.
+  2026-06-09 16:19:11.94 spid19s     XE_DumpCallbacks is executing...
+  2026-06-09 16:19:11.97 spid19s     DumpCallbackSOS is executing...
+  2026-06-09 16:19:11.97 spid19s     DumpCallbackEE is executing...
+  2026-06-09 16:19:11.97 spid19s     DumpCallbackSE is executing...
+  2026-06-09 16:19:11.97 spid19s     DumpCallbackSEAM is executing...
+  2026-06-09 16:19:11.98 spid19s     DumpCallbackSSB is executing...
+  2026-06-09 16:19:12.02 spid19s     DumpCallbackQE is executing...
+  2026-06-09 16:19:12.02 spid19s     DumpCallbackFullText is executing...
+  2026-06-09 16:19:12.02 spid19s     DumpCallbackSQLCLR is executing...
+  2026-06-09 16:19:12.02 spid19s     DumpCallbackHk is executing...
+  2026-06-09 16:19:12.02 spid19s     DumpCallbackRepl is executing...
+  2026-06-09 16:19:12.02 spid19s     DumpCallbackPolyBase is executing...
+  2026-06-09 16:19:12.02 spid19s     CDmpClient::ExecuteAllCallbacks completed. Time elapsed: 0 seconds.
+  2026-06-09 16:19:12.40 Server      External governance manager initialized
+  2026-06-09 16:19:13.81 spid19s     External dump process return code 0x20000001.
+  External dump process returned no errors.
+  
+
+================================================================================
+SQL Server ERRORLOG
+================================================================================
+File: C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG
+2026-06-09 16:19:14.15 Server      Microsoft SQL Server 2022 (RTM-CU25) (KB5081477) - 16.0.4255.1 (X64) 
+	Apr 23 2026 22:38:54 
+	Copyright (C) 2022 Microsoft Corporation
+	Express Edition (64-bit) on Windows 10 Home Single Language 10.0 <X64> (Build 26200: )
+
+2026-06-09 16:19:14.18 Server      UTC adjustment: -6:00
+2026-06-09 16:19:14.18 Server      (c) Microsoft Corporation.
+2026-06-09 16:19:14.18 Server      All rights reserved.
+2026-06-09 16:19:14.18 Server      Server process ID is 3712.
+2026-06-09 16:19:14.18 Server      System Manufacturer: 'HP', System Model: 'HP Pavilion Laptop 15-eh0xxx'.
+2026-06-09 16:19:14.18 Server      Authentication mode is MIXED.
+2026-06-09 16:19:14.18 Server      Logging SQL Server messages in file 'C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG'.
+2026-06-09 16:19:14.18 Server      The service account is 'NT Service\MSSQLSERVER'. This is an informational message; no user action is required.
+2026-06-09 16:19:14.18 Server      Registry startup parameters: 
+	 -d C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\master.mdf
+	 -e C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG
+	 -l C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\mastlog.ldf
+2026-06-09 16:19:14.18 Server      Command Line Startup Parameters:
+	 -s "MSSQLSERVER"
+	 -m "SqlSetup"
+	 -T 4022
+	 -T 4010
+	 -T 1905
+	 -T 3701
+	 -T 8015
+2026-06-09 16:19:14.18 Server      SQL Server detected 1 sockets with 6 cores per socket and 6 logical processors per socket, 6 total logical processors; using 4 logical processors based on SQL Server licensing. This is an informational message; no user action is required.
+2026-06-09 16:19:14.18 Server      SQL Server is starting at normal priority base (=7). This is an informational message only. No user action is required.
+2026-06-09 16:19:14.18 Server      Detected 7541 MB of RAM, 1627 MB of available memory, 2584 MB of available page file. This is an informational message; no user action is required.
+2026-06-09 16:19:14.18 Server      Using conventional memory in the memory manager.
+2026-06-09 16:19:14.18 Server      Detected pause instruction latency: 71 cycles.
+2026-06-09 16:19:14.18 Server      SQL Server detected the following NUMA node configuration (NUMA Node number 0, Processor Group number 0, CPU Mask 0x000000000000003f).
+2026-06-09 16:19:14.19 Server      Page exclusion bitmap is enabled.
+2026-06-09 16:19:14.22 Server      Buffer Pool: Allocating 4194304 bytes for 404531 hashPages.
+2026-06-09 16:19:14.22 Server      Default collation: SQL_Latin1_General_CP1_CI_AS (us_english 1033)
+2026-06-09 16:19:14.27 Server      Buffer pool extension is already disabled. No action is necessary.
+2026-06-09 16:19:14.33 Server      CPU vectorization level(s) detected:  SSE SSE2 SSE3 SSSE3 SSE41 SSE42 AVX AVX2 POPCNT BMI1 BMI2
+2026-06-09 16:19:14.34 Server      Perfmon counters for resource governor pools and groups failed to initialize and are disabled.
+2026-06-09 16:19:14.37 Server      Query Store settings initialized with enabled = 1, 
+2026-06-09 16:19:14.37 Server      The maximum number of dedicated administrator connections for this instance is '1'
+2026-06-09 16:19:14.37 Server      This instance of SQL Server last reported using a process ID of 14352 at 9/06/2026 16:19:11 (local) 9/06/2026 22:19:11 (UTC). This is an informational message only; no user action is required.
+2026-06-09 16:19:14.37 Server      Node configuration: node 0: CPU mask: 0x000000000000000f:0 Active CPU mask: 0x000000000000000f:0. This message provides a description of the NUMA configuration for this computer. This is an informational message only. No user action is required.
+2026-06-09 16:19:14.38 Server      Using dynamic lock allocation.  Initial allocation of 2500 Lock blocks and 5000 Lock Owner blocks per node.  This is an informational message only.  No user action is required.
+2026-06-09 16:19:14.39 Server      In-Memory OLTP initialized on lowend machine.
+2026-06-09 16:19:14.41 Server      [INFO] Created Extended Events session 'hkenginexesession'
+2026-06-09 16:19:14.41 Server      Database Instant File Initialization: disabled. For security and performance considerations see the topic 'Database Instant File Initialization' in SQL Server Books Online. This is an informational message only. No user action is required.
+2026-06-09 16:19:14.41 Server      Total Log Writer threads: 2. This is an informational message; no user action is required.
+2026-06-09 16:19:14.41 Server      Database Mirroring Transport is disabled in the endpoint configuration.
+2026-06-09 16:19:14.41 Server      clwb is selected for pmem flush operation.
+2026-06-09 16:19:14.41 spid20s     Warning ******************
+2026-06-09 16:19:14.41 spid20s     SQL Server started in single-user mode. This an informational message only. No user action is required.
+2026-06-09 16:19:14.42 Server      Software Usage Metrics is disabled.
+2026-06-09 16:19:14.42 spid20s     Starting up database 'master'.
+2026-06-09 16:19:14.44 spid20s     There have been 256 misaligned log IOs which required falling back to synchronous IO.  The current IO is on file C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\master.mdf.
+2026-06-09 16:19:14.45 spid20s     Unable to create stack dump file due to stack shortage (ex_terminator - Last chance exception handling)
+2026-06-09 16:19:14.45 spid20s     Stack Signature for the dump is 0x0000000000000000
+2026-06-09 16:19:14.45 spid20s     SaveNumaNodeRelationShip : 0 of 1 numa nodes info saved to pDump.
+2026-06-09 16:19:14.45 spid20s     CDmpClient::ExecuteAllCallbacks started.
+2026-06-09 16:19:14.45 spid20s     XE_DumpCallbacks is executing...
+2026-06-09 16:19:14.48 spid20s     DumpCallbackSOS is executing...
+2026-06-09 16:19:14.48 spid20s     DumpCallbackEE is executing...
+2026-06-09 16:19:14.48 spid20s     DumpCallbackSE is executing...
+2026-06-09 16:19:14.48 spid20s     DumpCallbackSEAM is executing...
+2026-06-09 16:19:14.48 spid20s     DumpCallbackSSB is executing...
+2026-06-09 16:19:14.52 spid20s     DumpCallbackQE is executing...
+2026-06-09 16:19:14.52 spid20s     DumpCallbackFullText is executing...
+2026-06-09 16:19:14.52 spid20s     DumpCallbackSQLCLR is executing...
+2026-06-09 16:19:14.52 spid20s     DumpCallbackHk is executing...
+2026-06-09 16:19:14.53 spid20s     DumpCallbackRepl is executing...
+2026-06-09 16:19:14.53 spid20s     DumpCallbackPolyBase is executing...
+2026-06-09 16:19:14.53 spid20s     CDmpClient::ExecuteAllCallbacks completed. Time elapsed: 0 seconds.
+2026-06-09 16:19:14.90 Server      External governance manager initialized
+2026-06-09 16:19:16.20 spid20s     External dump process return code 0x20000001.
+External dump process returned no errors.
+
+File: C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG.1
+2026-06-09 16:19:11.61 Server      Microsoft SQL Server 2022 (RTM-CU25) (KB5081477) - 16.0.4255.1 (X64) 
+	Apr 23 2026 22:38:54 
+	Copyright (C) 2022 Microsoft Corporation
+	Express Edition (64-bit) on Windows 10 Home Single Language 10.0 <X64> (Build 26200: )
+
+2026-06-09 16:19:11.64 Server      UTC adjustment: -6:00
+2026-06-09 16:19:11.64 Server      (c) Microsoft Corporation.
+2026-06-09 16:19:11.64 Server      All rights reserved.
+2026-06-09 16:19:11.64 Server      Server process ID is 14352.
+2026-06-09 16:19:11.64 Server      System Manufacturer: 'HP', System Model: 'HP Pavilion Laptop 15-eh0xxx'.
+2026-06-09 16:19:11.64 Server      Authentication mode is MIXED.
+2026-06-09 16:19:11.64 Server      Logging SQL Server messages in file 'C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG'.
+2026-06-09 16:19:11.64 Server      The service account is 'NT Service\MSSQLSERVER'. This is an informational message; no user action is required.
+2026-06-09 16:19:11.64 Server      Registry startup parameters: 
+	 -d C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\master.mdf
+	 -e C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG
+	 -l C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\mastlog.ldf
+2026-06-09 16:19:11.64 Server      Command Line Startup Parameters:
+	 -s "MSSQLSERVER"
+	 -m "SqlSetup"
+	 -T 4022
+	 -T 4010
+	 -T 1905
+	 -T 3701
+	 -T 8015
+2026-06-09 16:19:11.64 Server      SQL Server detected 1 sockets with 6 cores per socket and 6 logical processors per socket, 6 total logical processors; using 4 logical processors based on SQL Server licensing. This is an informational message; no user action is required.
+2026-06-09 16:19:11.64 Server      SQL Server is starting at normal priority base (=7). This is an informational message only. No user action is required.
+2026-06-09 16:19:11.65 Server      Detected 7541 MB of RAM, 1613 MB of available memory, 2570 MB of available page file. This is an informational message; no user action is required.
+2026-06-09 16:19:11.65 Server      Using conventional memory in the memory manager.
+2026-06-09 16:19:11.65 Server      Detected pause instruction latency: 71 cycles.
+2026-06-09 16:19:11.65 Server      SQL Server detected the following NUMA node configuration (NUMA Node number 0, Processor Group number 0, CPU Mask 0x000000000000003f).
+2026-06-09 16:19:11.65 Server      Page exclusion bitmap is enabled.
+2026-06-09 16:19:11.70 Server      Buffer Pool: Allocating 4194304 bytes for 402226 hashPages.
+2026-06-09 16:19:11.71 Server      Default collation: SQL_Latin1_General_CP1_CI_AS (us_english 1033)
+2026-06-09 16:19:11.74 Server      Buffer pool extension is already disabled. No action is necessary.
+2026-06-09 16:19:11.80 Server      CPU vectorization level(s) detected:  SSE SSE2 SSE3 SSSE3 SSE41 SSE42 AVX AVX2 POPCNT BMI1 BMI2
+2026-06-09 16:19:11.81 Server      Perfmon counters for resource governor pools and groups failed to initialize and are disabled.
+2026-06-09 16:19:11.84 Server      Query Store settings initialized with enabled = 1, 
+2026-06-09 16:19:11.84 Server      The maximum number of dedicated administrator connections for this instance is '1'
+2026-06-09 16:19:11.84 Server      This instance of SQL Server last reported using a process ID of 19904 at 9/06/2026 16:19:06 (local) 9/06/2026 22:19:06 (UTC). This is an informational message only; no user action is required.
+2026-06-09 16:19:11.84 Server      Node configuration: node 0: CPU mask: 0x000000000000000f:0 Active CPU mask: 0x000000000000000f:0. This message provides a description of the NUMA configuration for this computer. This is an informational message only. No user action is required.
+2026-06-09 16:19:11.85 Server      Using dynamic lock allocation.  Initial allocation of 2500 Lock blocks and 5000 Lock Owner blocks per node.  This is an informational message only.  No user action is required.
+2026-06-09 16:19:11.86 Server      In-Memory OLTP initialized on lowend machine.
+2026-06-09 16:19:11.89 Server      [INFO] Created Extended Events session 'hkenginexesession'
+2026-06-09 16:19:11.89 Server      Database Instant File Initialization: disabled. For security and performance considerations see the topic 'Database Instant File Initialization' in SQL Server Books Online. This is an informational message only. No user action is required.
+2026-06-09 16:19:11.89 Server      Total Log Writer threads: 2. This is an informational message; no user action is required.
+2026-06-09 16:19:11.91 Server      Database Mirroring Transport is disabled in the endpoint configuration.
+2026-06-09 16:19:11.91 spid19s     Warning ******************
+2026-06-09 16:19:11.91 Server      clwb is selected for pmem flush operation.
+2026-06-09 16:19:11.91 spid19s     SQL Server started in single-user mode. This an informational message only. No user action is required.
+2026-06-09 16:19:11.91 Server      Software Usage Metrics is disabled.
+2026-06-09 16:19:11.92 spid19s     Starting up database 'master'.
+2026-06-09 16:19:11.94 spid19s     There have been 256 misaligned log IOs which required falling back to synchronous IO.  The current IO is on file C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\master.mdf.
+2026-06-09 16:19:11.94 spid19s     Unable to create stack dump file due to stack shortage (ex_terminator - Last chance exception handling)
+2026-06-09 16:19:11.94 spid19s     Stack Signature for the dump is 0x0000000000000000
+2026-06-09 16:19:11.94 spid19s     SaveNumaNodeRelationShip : 0 of 1 numa nodes info saved to pDump.
+2026-06-09 16:19:11.94 spid19s     CDmpClient::ExecuteAllCallbacks started.
+2026-06-09 16:19:11.94 spid19s     XE_DumpCallbacks is executing...
+2026-06-09 16:19:11.97 spid19s     DumpCallbackSOS is executing...
+2026-06-09 16:19:11.97 spid19s     DumpCallbackEE is executing...
+2026-06-09 16:19:11.97 spid19s     DumpCallbackSE is executing...
+2026-06-09 16:19:11.97 spid19s     DumpCallbackSEAM is executing...
+2026-06-09 16:19:11.98 spid19s     DumpCallbackSSB is executing...
+2026-06-09 16:19:12.02 spid19s     DumpCallbackQE is executing...
+2026-06-09 16:19:12.02 spid19s     DumpCallbackFullText is executing...
+2026-06-09 16:19:12.02 spid19s     DumpCallbackSQLCLR is executing...
+2026-06-09 16:19:12.02 spid19s     DumpCallbackHk is executing...
+2026-06-09 16:19:12.02 spid19s     DumpCallbackRepl is executing...
+2026-06-09 16:19:12.02 spid19s     DumpCallbackPolyBase is executing...
+2026-06-09 16:19:12.02 spid19s     CDmpClient::ExecuteAllCallbacks completed. Time elapsed: 0 seconds.
+2026-06-09 16:19:12.40 Server      External governance manager initialized
+2026-06-09 16:19:13.81 spid19s     External dump process return code 0x20000001.
+External dump process returned no errors.
+
+File: C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG.2
+2026-06-09 16:19:06.63 Server      Microsoft SQL Server 2022 (RTM-CU25) (KB5081477) - 16.0.4255.1 (X64) 
+	Apr 23 2026 22:38:54 
+	Copyright (C) 2022 Microsoft Corporation
+	Express Edition (64-bit) on Windows 10 Home Single Language 10.0 <X64> (Build 26200: )
+
+2026-06-09 16:19:06.66 Server      UTC adjustment: -6:00
+2026-06-09 16:19:06.66 Server      (c) Microsoft Corporation.
+2026-06-09 16:19:06.67 Server      All rights reserved.
+2026-06-09 16:19:06.67 Server      Server process ID is 19904.
+2026-06-09 16:19:06.67 Server      System Manufacturer: 'HP', System Model: 'HP Pavilion Laptop 15-eh0xxx'.
+2026-06-09 16:19:06.67 Server      Authentication mode is MIXED.
+2026-06-09 16:19:06.67 Server      Logging SQL Server messages in file 'C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG'.
+2026-06-09 16:19:06.68 Server      The service account is 'NT Service\MSSQLSERVER'. This is an informational message; no user action is required.
+2026-06-09 16:19:06.68 Server      Registry startup parameters: 
+	 -d C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\master.mdf
+	 -e C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG
+	 -l C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\mastlog.ldf
+2026-06-09 16:19:06.68 Server      Command Line Startup Parameters:
+	 -s "MSSQLSERVER"
+	 -m "SqlSetup"
+	 -T 4022
+	 -T 4010
+	 -T 1905
+	 -T 3701
+	 -T 8015
+2026-06-09 16:19:06.68 Server      SQL Server detected 1 sockets with 6 cores per socket and 6 logical processors per socket, 6 total logical processors; using 4 logical processors based on SQL Server licensing. This is an informational message; no user action is required.
+2026-06-09 16:19:06.68 Server      SQL Server is starting at normal priority base (=7). This is an informational message only. No user action is required.
+2026-06-09 16:19:06.68 Server      Detected 7541 MB of RAM, 1623 MB of available memory, 2563 MB of available page file. This is an informational message; no user action is required.
+2026-06-09 16:19:06.68 Server      Using conventional memory in the memory manager.
+2026-06-09 16:19:06.68 Server      Detected pause instruction latency: 71 cycles.
+2026-06-09 16:19:06.68 Server      SQL Server detected the following NUMA node configuration (NUMA Node number 0, Processor Group number 0, CPU Mask 0x000000000000003f).
+2026-06-09 16:19:06.68 Server      Page exclusion bitmap is enabled.
+2026-06-09 16:19:06.73 Server      Buffer Pool: Allocating 4194304 bytes for 401193 hashPages.
+2026-06-09 16:19:06.74 Server      Default collation: SQL_Latin1_General_CP1_CI_AS (us_english 1033)
+2026-06-09 16:19:06.79 Server      Buffer pool extension is already disabled. No action is necessary.
+2026-06-09 16:19:06.85 Server      CPU vectorization level(s) detected:  SSE SSE2 SSE3 SSSE3 SSE41 SSE42 AVX AVX2 POPCNT BMI1 BMI2
+2026-06-09 16:19:06.86 Server      Perfmon counters for resource governor pools and groups failed to initialize and are disabled.
+2026-06-09 16:19:06.90 Server      Query Store settings initialized with enabled = 1, 
+2026-06-09 16:19:06.91 Server      The maximum number of dedicated administrator connections for this instance is '1'
+2026-06-09 16:19:06.91 Server      This instance of SQL Server last reported using a process ID of 20784 at 9/06/2026 16:17:18 (local) 9/06/2026 22:17:18 (UTC). This is an informational message only; no user action is required.
+2026-06-09 16:19:06.91 Server      Node configuration: node 0: CPU mask: 0x000000000000000f:0 Active CPU mask: 0x000000000000000f:0. This message provides a description of the NUMA configuration for this computer. This is an informational message only. No user action is required.
+2026-06-09 16:19:06.91 Server      Using dynamic lock allocation.  Initial allocation of 2500 Lock blocks and 5000 Lock Owner blocks per node.  This is an informational message only.  No user action is required.
+2026-06-09 16:19:06.93 Server      In-Memory OLTP initialized on lowend machine.
+2026-06-09 16:19:06.95 Server      [INFO] Created Extended Events session 'hkenginexesession'
+2026-06-09 16:19:06.95 Server      Database Instant File Initialization: disabled. For security and performance considerations see the topic 'Database Instant File Initialization' in SQL Server Books Online. This is an informational message only. No user action is required.
+2026-06-09 16:19:06.95 Server      Total Log Writer threads: 2. This is an informational message; no user action is required.
+2026-06-09 16:19:06.96 Server      Database Mirroring Transport is disabled in the endpoint configuration.
+2026-06-09 16:19:06.96 Server      clwb is selected for pmem flush operation.
+2026-06-09 16:19:06.96 spid19s     Warning ******************
+2026-06-09 16:19:06.96 Server      Software Usage Metrics is disabled.
+2026-06-09 16:19:06.96 spid19s     SQL Server started in single-user mode. This an informational message only. No user action is required.
+2026-06-09 16:19:06.96 spid19s     Starting up database 'master'.
+2026-06-09 16:19:07.00 spid19s     There have been 256 misaligned log IOs which required falling back to synchronous IO.  The current IO is on file C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\master.mdf.
+2026-06-09 16:19:07.00 spid19s     06/09/26 16:19:07 Stack Overflow Dump not possible - Exception c00000fd EXCEPTION_STACK_OVERFLOW at 0x00007FFB149B867B
+2026-06-09 16:19:07.00 spid19s     SqlDumpExceptionHandler: Address=0x00007FFB149B867B Exception Code = c00000fd
+2026-06-09 16:19:07.00 spid19s     Rax=0000000016d60d58 Rbx=0000000000000000 Rcx=000000000450c040 Rdx=0000000005589000
+2026-06-09 16:19:07.00 spid19s     Rsi=000000000450c040 Rdi=0000000000004000 Rip=00000000149b867b Rsp=0000000037c12000
+2026-06-09 16:19:07.00 spid19s     Rbp=0000000037c12130 EFlags=0000000000010246
+2026-06-09 16:19:07.00 spid19s     cs=0000000000000033 ss=000000000000002b ds=000000000000002b
+es=000000000000002b fs=0000000000000053 gs=000000000000002b
+2026-06-09 16:19:07.26 spid19s     Frame 0: 0x00007FFB41E28BD6
+2026-06-09 16:19:07.26 spid19s     Frame 1: 0x00007FFB42DB37D6
+2026-06-09 16:19:07.26 spid19s     Frame 2: 0x00007FFB41E28560
+2026-06-09 16:19:07.26 spid19s     Frame 3: 0x00007FFB4D2877A6
+2026-06-09 16:19:07.26 spid19s     Frame 4: 0x00007FFB4D222B6C
+2026-06-09 16:19:07.26 spid19s     Frame 5: 0x00007FFB4D222DEB
+2026-06-09 16:19:07.26 spid19s     Frame 6: 0x00007FFBB310F638
+2026-06-09 16:19:07.26 spid19s     Frame 7: 0x00007FFBB31024A8
+2026-06-09 16:19:07.26 spid19s     Frame 8: 0x00007FFBB3101E72
+2026-06-09 16:19:07.26 spid19s     Frame 9: 0x00007FFBB3102DC3
+2026-06-09 16:19:07.26 spid19s     Frame 10: 0x00007FFBB3110241
+2026-06-09 16:19:07.26 spid19s     Frame 11: 0x00007FFBC0F063DF
+2026-06-09 16:19:07.26 spid19s     Frame 12: 0x00007FFBC0DB9497
+2026-06-09 16:19:07.26 spid19s     Frame 13: 0x00007FFBC0F05D1E
+2026-06-09 16:19:07.26 spid19s     Frame 14: 0x00007FFB149B867B
+2026-06-09 16:19:07.26 spid19s     Frame 15: 0x00007FFB15D0D518
+2026-06-09 16:19:07.26 spid19s     
+2026-06-09 16:19:07.26 spid19s     TotalPhysicalMemory = 7907418112, AvailablePhysicalMemory = 1554259968
+2026-06-09 16:19:07.26 spid19s     AvailableVirtualMemory = 140727687741440, AvailablePagingFile = 2486910976
+2026-06-09 16:19:07.26 spid19s     Stack Signature for the dump is 0x000000010B4842DE
+2026-06-09 16:19:07.26 spid19s     SaveNumaNodeRelationShip : 0 of 1 numa nodes info saved to pDump.
+2026-06-09 16:19:07.48 Server      External governance manager initialized
+2026-06-09 16:19:09.11 spid19s     External dump process return code 0x20000001.
+External dump process returned no errors.
+
+2026-06-09 16:19:09.13 Server      CLR version v4.0.30319 loaded.
+2026-06-09 16:19:09.16 spid19s     Unable to create stack dump file due to stack shortage (ex_terminator - Last chance exception handling)
+2026-06-09 16:19:09.16 spid19s     Stack Signature for the dump is 0x0000000000000000
+2026-06-09 16:19:09.16 spid19s     SaveNumaNodeRelationShip : 0 of 1 numa nodes info saved to pDump.
+2026-06-09 16:19:09.16 spid19s     CDmpClient::ExecuteAllCallbacks started.
+2026-06-09 16:19:09.16 spid19s     XE_DumpCallbacks is executing...
+2026-06-09 16:19:09.19 spid19s     DumpCallbackSOS is executing...
+2026-06-09 16:19:09.19 spid19s     DumpCallbackEE is executing...
+2026-06-09 16:19:09.20 spid19s     DumpCallbackSE is executing...
+2026-06-09 16:19:09.20 spid19s     DumpCallbackSEAM is executing...
+2026-06-09 16:19:09.20 spid19s     DumpCallbackSSB is executing...
+2026-06-09 16:19:09.24 spid19s     DumpCallbackQE is executing...
+2026-06-09 16:19:09.24 spid19s     DumpCallbackFullText is executing...
+2026-06-09 16:19:09.24 spid19s     DumpCallbackSQLCLR is executing...
+2026-06-09 16:19:09.24 spid19s     DumpCallbackHk is executing...
+2026-06-09 16:19:09.25 spid19s     DumpCallbackRepl is executing...
+2026-06-09 16:19:09.25 spid19s     DumpCallbackPolyBase is executing...
+2026-06-09 16:19:09.25 spid19s     CDmpClient::ExecuteAllCallbacks completed. Time elapsed: 0 seconds.
+2026-06-09 16:19:11.26 spid19s     External dump process return code 0x20000001.
+External dump process returned no errors.
+
+
+================================================================================
+SQL Setup Bootstrap Logs
+================================================================================
+File: C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Log\20260609_161614\Detail.txt
+(01) 2026-06-09 16:19:26 Slp: Running Action: OptimizeCacheAction
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to create base registry key HKEY_LOCAL_MACHINE, machine 
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to open registry subkey Software\Microsoft\Microsoft SQL Server\160\Bootstrap
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to get registry value BootstrapDir
+(01) 2026-06-09 16:19:26 Slp: Optimizing C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Update Cache\KB5081477\QFE ... 
+(01) 2026-06-09 16:19:26 Slp: Removed package C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Update Cache\KB5081477\QFE\1033_ENU_LP\x64\Setup\MASTERDATASERVICESLOC.MSI
+(01) 2026-06-09 16:19:26 Slp: Removed package C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Update Cache\KB5081477\QFE\1033_ENU_LP\x64\Setup\x64\SQLLOCALDB.MSI
+(01) 2026-06-09 16:19:26 Slp: Removed package C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Update Cache\KB5081477\QFE\x64\Setup\MASTERDATASERVICES.MSI
+(01) 2026-06-09 16:19:26 Slp: Completed Action: OptimizeCacheAction, returned True
+(01) 2026-06-09 16:19:26 Slp: ----------------------------------------------------------------------
+(01) 2026-06-09 16:19:26 Slp: Running Action: PendingRebootAction
+(01) 2026-06-09 16:19:26 Slp: Loading rule: RebootRequiredCheck
+(01) 2026-06-09 16:19:26 Slp: Creating rule target object: Microsoft.SqlServer.Configuration.SetupExtension.FacetRebootRequired
+(01) 2026-06-09 16:19:26 Slp: Rule applied features  : ALL
+(01) 2026-06-09 16:19:26 Slp: Start rule execution, total number of rules loaded: 1
+(01) 2026-06-09 16:19:26 Slp: Initializing rule      : Reiniciar el equipo
+(01) 2026-06-09 16:19:26 Slp: Rule is will be executed  : True
+(01) 2026-06-09 16:19:26 Slp: Init rule target object: Microsoft.SqlServer.Configuration.SetupExtension.FacetRebootRequired
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*1\??\C:\Program Files\Common Files\microsoft shared\ClickToRun\backup\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\vcruntime140_1.dll"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\Program Files\Common Files\microsoft shared\ClickToRun\backup\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\vcruntime140_1.dll"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*1\??\C:\Program Files\Common Files\microsoft shared\ClickToRun\backup\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\vcruntime140.dll"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\Program Files\Common Files\microsoft shared\ClickToRun\backup\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\vcruntime140.dll"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*1\??\C:\Program Files\Common Files\microsoft shared\ClickToRun\backup\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\OfficeC2RClient.exe"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\Program Files\Common Files\microsoft shared\ClickToRun\backup\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\OfficeC2RClient.exe"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*1\??\C:\Program Files\Common Files\microsoft shared\ClickToRun\backup\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\msvcp140.dll"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\Program Files\Common Files\microsoft shared\ClickToRun\backup\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\msvcp140.dll"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*1\??\C:\Program Files\Common Files\microsoft shared\ClickToRun\backup\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\ApiClient.dll"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\Program Files\Common Files\microsoft shared\ClickToRun\backup\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\ApiClient.dll"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*1\??\C:\Program Files\Common Files\microsoft shared\ClickToRun\backup\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\Program Files\Common Files\microsoft shared\ClickToRun\backup\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*1\??\C:\Program Files\Microsoft Office\Updates\Apply\FilesInUse\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\TxFO\root\vfs\ProgramFilesCommonX64\Microsoft Shared\Office16\msoshext.dll"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\Program Files\Microsoft Office\Updates\Apply\FilesInUse\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\TxFO\root\vfs\ProgramFilesCommonX64\Microsoft Shared\Office16\msoshext.dll"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*1\??\C:\Program Files\Microsoft Office\Updates\Apply\FilesInUse\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\TxFO\root\vfs\ProgramFilesCommonX64\Microsoft Shared\Office16"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\Program Files\Microsoft Office\Updates\Apply\FilesInUse\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\TxFO\root\vfs\ProgramFilesCommonX64\Microsoft Shared\Office16"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*1\??\C:\Program Files\Microsoft Office\Updates\Apply\FilesInUse\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\TxFO\root\vfs\ProgramFilesCommonX64\Microsoft Shared\Filters\offfiltx.dll"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\Program Files\Microsoft Office\Updates\Apply\FilesInUse\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\TxFO\root\vfs\ProgramFilesCommonX64\Microsoft Shared\Filters\offfiltx.dll"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*1\??\C:\Program Files\Microsoft Office\Updates\Apply\FilesInUse\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\TxFO\root\vfs\ProgramFilesCommonX64\Microsoft Shared\Filters"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\Program Files\Microsoft Office\Updates\Apply\FilesInUse\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\TxFO\root\vfs\ProgramFilesCommonX64\Microsoft Shared\Filters"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*1\??\C:\Program Files\Microsoft Office\Updates\Apply\FilesInUse\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\TxFO\root\vfs\ProgramFilesCommonX64\Microsoft Shared"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\Program Files\Microsoft Office\Updates\Apply\FilesInUse\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\TxFO\root\vfs\ProgramFilesCommonX64\Microsoft Shared"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*1\??\C:\Program Files\Microsoft Office\Updates\Apply\FilesInUse\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\TxFO\root\vfs\ProgramFilesCommonX64"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\Program Files\Microsoft Office\Updates\Apply\FilesInUse\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\TxFO\root\vfs\ProgramFilesCommonX64"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*1\??\C:\Program Files\Microsoft Office\Updates\Apply\FilesInUse\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\TxFO\root\vfs"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\Program Files\Microsoft Office\Updates\Apply\FilesInUse\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\TxFO\root\vfs"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*1\??\C:\Program Files\Microsoft Office\Updates\Apply\FilesInUse\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\TxFO\root"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\Program Files\Microsoft Office\Updates\Apply\FilesInUse\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\TxFO\root"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*1\??\C:\Program Files\Microsoft Office\Updates\Apply\FilesInUse\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\TxFO"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\Program Files\Microsoft Office\Updates\Apply\FilesInUse\AC25F54E-72A5-4C16-A1B0-3A3F1C191E8C\TxFO"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*1\??\C:\Program Files\Common Files\microsoft shared\ClickToRun\Updates\16.0.20026.20140"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\Program Files\Common Files\microsoft shared\ClickToRun\Updates\16.0.20026.20140"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*1\??\C:\Program Files\Common Files\microsoft shared\ClickToRun\Updates"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\Program Files\Common Files\microsoft shared\ClickToRun\Updates"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*2\??\C:\WINDOWS\fonts\OFFSYM.TTF"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\WINDOWS\fonts\OFFSYM.TTF"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*2\??\C:\WINDOWS\fonts\OFFSYMB.TTF"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\WINDOWS\fonts\OFFSYMB.TTF"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*2\??\C:\WINDOWS\fonts\OFFSYML.TTF"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\WINDOWS\fonts\OFFSYML.TTF"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*2\??\C:\WINDOWS\fonts\OFFSYMSB.TTF"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\WINDOWS\fonts\OFFSYMSB.TTF"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*2\??\C:\WINDOWS\fonts\OFFSYMSL.TTF"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\WINDOWS\fonts\OFFSYMSL.TTF"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*2\??\C:\WINDOWS\fonts\OFFSYMXL.TTF"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\WINDOWS\fonts\OFFSYMXL.TTF"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*2\??\C:\WINDOWS\fonts\flat_officeFontsPreview.ttf"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\WINDOWS\fonts\flat_officeFontsPreview.ttf"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*1\??\C:\Windows\System32\spool\V4Dirs\DBFEF59F-B121-40CC-95E2-6072F15D658B\94766af2.BUD"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\Windows\System32\spool\V4Dirs\DBFEF59F-B121-40CC-95E2-6072F15D658B\94766af2.BUD"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*2\??\C:\WINDOWS\system32\spool\V4Dirs\DBFEF59F-B121-40CC-95E2-6072F15D658B\94766af2.gpd"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\WINDOWS\system32\spool\V4Dirs\DBFEF59F-B121-40CC-95E2-6072F15D658B\94766af2.gpd"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*1\??\C:\Windows\System32\spool\V4Dirs\DBFEF59F-B121-40CC-95E2-6072F15D658B"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\Windows\System32\spool\V4Dirs\DBFEF59F-B121-40CC-95E2-6072F15D658B"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*1\??\C:\Program Files (x86)\Microsoft\EdgeUpdate\1.3.237.7"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\Program Files (x86)\Microsoft\EdgeUpdate\1.3.237.7"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': inspecting file: "*1\??\C:\ProgramData\Microsoft\EdgeUpdate\Log\MicrosoftEdgeUpdate.log"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved file: "C:\ProgramData\Microsoft\EdgeUpdate\Log\MicrosoftEdgeUpdate.log"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': resolved target file: "C:\ProgramData\Microsoft\EdgeUpdate\Log\MicrosoftEdgeUpdate.log.bak"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck': file is not on product name list: "C:\ProgramData\Microsoft\EdgeUpdate\Log\MicrosoftEdgeUpdate.log"
+(01) 2026-06-09 16:19:26 Slp: Rule 'RebootRequiredCheck' results: IsRebootNotRequired=True
+(01) 2026-06-09 16:19:26 Slp: Evaluating rule        : RebootRequiredCheck
+(01) 2026-06-09 16:19:26 Slp: Rule running on machine: USUARIO
+(01) 2026-06-09 16:19:26 Slp: Rule evaluation done   : Succeeded
+(01) 2026-06-09 16:19:26 Slp: Rule evaluation message: El equipo no necesita reiniciarse.
+(01) 2026-06-09 16:19:26 Slp: Completed Action: PendingRebootAction, returned True
+(01) 2026-06-09 16:19:26 Slp: ----------------------------------------------------------------------
+(01) 2026-06-09 16:19:26 Slp: Skipping Action: NotifyProgressComplete due to user cancel request
+(01) 2026-06-09 16:19:26 Slp: ----------------------------------------------------------------------
+(01) 2026-06-09 16:19:26 Slp: Skipping Action: DetermineProductFeatureSummary
+(01) 2026-06-09 16:19:26 Slp: Action is being skipped due to the following restrictions: 
+(01) 2026-06-09 16:19:26 Slp: Condition "Is the datastore flag /Scenario/Patching/IsRunningInnerSetup set" did not pass as it returned false and true was expected.
+(01) 2026-06-09 16:19:26 Slp: ----------------------------------------------------------------------
+(01) 2026-06-09 16:19:26 Slp: Running Action: FinalizeProgressStatus
+(01) 2026-06-09 16:19:26 Slp: Completed Action: FinalizeProgressStatus, returned True
+(01) 2026-06-09 16:19:26 Slp: ----------------------------------------------------------------------
+(01) 2026-06-09 16:19:26 Slp: Running Action: RebootMessageAction
+(01) 2026-06-09 16:19:26 Slp: Completed Action: RebootMessageAction, returned True
+(01) 2026-06-09 16:19:26 Slp: ----------------------------------------------------------------------
+(01) 2026-06-09 16:19:26 Slp: Running Action: CloseUI
+(01) 2026-06-09 16:19:26 Slp: Stop action skipped in UI Mode Quiet
+(01) 2026-06-09 16:19:26 Slp: Completed Action: CloseUI, returned True
+(01) 2026-06-09 16:19:26 Slp: SetupTelemetry: Writing Telemetry to Datastore
+(01) 2026-06-09 16:19:29 Slp: 
+(01) 2026-06-09 16:19:29 Slp: 
+(01) 2026-06-09 16:19:29 Slp: ----------------------------------------------------------------------
+(01) 2026-06-09 16:19:29 Slp: 
+(01) 2026-06-09 16:19:29 Slp: Resultado de error: -2061893606
+(01) 2026-06-09 16:19:29 Slp: CÃ³digo de componente del resultado: 1306
+(01) 2026-06-09 16:19:29 Slp: CÃ³digo de error del resultado: 26
+(01) 2026-06-09 16:19:29 Slp: SetupTelemetry: Closing Telemetry Session
+(01) 2026-06-09 16:19:29 Slp: Sco: Attempting to create base registry key HKEY_LOCAL_MACHINE, machine 
+(01) 2026-06-09 16:19:29 Slp: Sco: Attempting to open registry subkey SOFTWARE\Microsoft\SQMClient
+(01) 2026-06-09 16:19:29 Slp: Sco: Attempting to get registry value MachineId
+(01) 2026-06-09 16:19:29 Slp: Sco: Attempting to create base registry key HKEY_LOCAL_MACHINE, machine 
+(01) 2026-06-09 16:19:29 Slp: Sco: Attempting to open registry subkey Software\Microsoft\Microsoft SQL Server\160
+(01) 2026-06-09 16:19:29 Slp: SetupTelemetry: Not creating telemetry audit log. Value 'UserRequestedLocalAuditDirectory' doesn't exist in 'HKLM\Software\Microsoft\Microsoft SQL Server\160'
+(01) 2026-06-09 16:19:29 Slp: Sco: Attempting to create base registry key HKEY_LOCAL_MACHINE, machine 
+(01) 2026-06-09 16:19:29 Slp: Sco: Attempting to open registry subkey Software\Microsoft\Microsoft SQL Server\160
+(01) 2026-06-09 16:19:29 Slp: Sco: Attempting to get registry value CustomerFeedback
+(01) 2026-06-09 16:19:29 Slp: Sco: Attempting to get registry value EnableErrorReporting
+(01) 2026-06-09 16:19:29 Slp: SetupTelemetry: Telemetry has an active session with 12 events.
+File: C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Log\Summary.txt
+Overall summary:
+  Final result:                  El instalador de la revisiÃ³n no ha podido actualizar la siguiente instancia:  MSSQLSERVER. Para determinar el motivo del error, consulte los archivos de registro.
+  Exit code (Decimal):           -2061893606
+  Start time:                    2026-06-09 16:16:14
+  End time:                      2026-06-09 16:19:26
+  Requested action:              Patch
+
+Instance MSSQLSERVER overall summary:
+  Final result:                  El instalador de la revisiÃ³n no ha podido actualizar las caracterÃ­sticas compartidas. Para determinar el motivo del error, consulte los archivos de registro.
+  Exit code (Decimal):           -2061893606
+  Start time:                    2026-06-09 16:16:42
+  End time:                      2026-06-09 16:19:21
+  Requested action:              Patch
+
+Machine Properties:
+  Machine name:                  USUARIO
+  Machine processor count:       6
+  OS version:                    Microsoft Windows 11 Home Single Language (10.0.26200)
+  OS service pack:               
+  OS region:                     Guatemala
+  OS language:                   espaÃ±ol (MÃ©xico)
+  OS architecture:               x64
+  Process architecture:          64 bits
+  OS clustered:                  No
+
+Product features discovered:
+  Product              Instance             Instance ID                    Feature                                  Language             Edition              Version         Clustered  Configured
+  SQL Server 2022      MSSQLSERVER          MSSQL16.MSSQLSERVER            Servicios de Motor de base de datos      1033                 Express Edition      16.0.1000.6     No         SÃ­        
+
+Package properties:
+  Description:                   Microsoft SQL Server 2022 
+  ProductName:                   SQL Server 2022
+  Type:                          RTM
+  Version:                       16
+  SPLevel:                       0
+  KBArticle:                     KB5081477
+  KBArticleHyperlink:            https://support.microsoft.com/?kbid=5081477
+  PatchType:                     QFE
+  AssociatedHotfixBuild:         0
+  Platform:                      x64
+  PatchLevel:                    16.0.4255.1
+  ProductVersion:                16.0.1000.6
+  GDRReservedRange:              16.0.1100.0:16.0.3999.0
+  Installation location:         C:\1347fd3f28ae37f7ef0ec130\x64\setup\
+
+Updated product edition:
+  Instance             Edition             
+  MSSQLSERVER          Express             
+
+ConfiguraciÃ³n de entrada de usuario:
+  ACTION:                        Patch
+  ALLINSTANCES:                  true
+  CLUSTERPASSIVE:                false
+  CONFIGURATIONFILE:             
+  ENU:                           false
+  HELP:                          false
+  IACCEPTSQLSERVERLICENSETERMS:  true
+  IACKNOWLEDGEENTCALLIMITS:      false
+  INDICATEPROGRESS:              false
+  INSTANCEID:                    <vacÃ­o>
+  INSTANCENAME:                  <vacÃ­o>
+  QUIET:                         true
+  QUIETSIMPLE:                   false
+  SUPPRESSPAIDEDITIONNOTICE:     false
+  SUPPRESSPRIVACYSTATEMENTNOTICE: false
+  UIMODE:                        Normal
+
+Rules with failures or warnings:
+
+Rules report file:               C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Log\20260609_161614\SystemConfigurationCheck_Report.htm
+File: C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Log\20260609_161614\MSSQLSERVER\Detail.txt
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value ProductId
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to open registry subkey {86AB2CC9-08BD-4643-B0F9-F82D006D72FF}
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value SQLProductPatchFamilyCode
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value ProductId
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to open registry subkey {8770AF64-BB4B-4404-BDD6-6AF8E4C461FC}
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value SQLProductPatchFamilyCode
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value ProductId
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to open registry subkey {8A2C1F4D-3B7E-4F9A-8C2D-1E5B6F9A3C7D}_is1
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value SQLProductPatchFamilyCode
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value ProductId
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to open registry subkey {8B8E9A13-6164-4776-8BC1-F64A7EBCF434}
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value SQLProductPatchFamilyCode
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value ProductId
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to open registry subkey {90160000-008C-0000-1000-0000000FF1CE}
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value SQLProductPatchFamilyCode
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value ProductId
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to open registry subkey {90160000-008C-0C0A-1000-0000000FF1CE}
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value SQLProductPatchFamilyCode
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value ProductId
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to open registry subkey {94AEB0A0-365C-449B-B573-D2ECB353EB06}
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value SQLProductPatchFamilyCode
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value ProductId
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to open registry subkey {A0F7ACBA-075F-4BC7-A85A-5DC301FCEC74}
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value SQLProductPatchFamilyCode
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value ProductId
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to open registry subkey {A7AB73A3-CB10-4AA5-9D38-6AEFFBDE4C91}
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value SQLProductPatchFamilyCode
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value ProductId
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to open registry subkey {AB5D8778-81F3-47E2-87A4-35E776CD664B}
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value SQLProductPatchFamilyCode
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value ProductId
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to open registry subkey {BD8B7339-7559-4FC3-95E6-264324D45235}
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value SQLProductPatchFamilyCode
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value ProductId
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to open registry subkey {C4CF167C-4739-4A3A-8D75-59C9C5F135CA}
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value SQLProductPatchFamilyCode
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value ProductId
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to open registry subkey {C6FD611E-7EFE-488C-A0E0-974C09EF6473}
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value SQLProductPatchFamilyCode
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value ProductId
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to open registry subkey {D6E82158-05B9-4A18-A624-EA135BC77766}
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value SQLProductPatchFamilyCode
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value ProductId
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to open registry subkey {DCA0C2D6-83BF-41AE-B1AB-C4181002DE40}
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value SQLProductPatchFamilyCode
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value ProductId
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to open registry subkey {E5FB98E0-0784-44F0-8CEC-95CD4690C43F}
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value SQLProductPatchFamilyCode
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value ProductId
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to open registry subkey {EAC54B82-7A37-4A9E-8953-474316BD40F6}
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value SQLProductPatchFamilyCode
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value ProductId
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to create base registry key HKEY_LOCAL_MACHINE, machine 
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to open registry subkey Software\Microsoft\Windows\CurrentVersion\Uninstall\KB5081477
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value PatchProductVersion
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value DisplayName
+(01) 2026-06-09 16:19:19 Slp: Sco: Attempting to get registry value HiddenDisplayName
+(01) 2026-06-09 16:19:19 Slp: Completed Action: CreateARPRegKeyAction, returned True
+(01) 2026-06-09 16:19:19 Slp: ----------------------------------------------------------------------
+(01) 2026-06-09 16:19:19 Slp: Skipping Action: OptimizeCacheAction
+(01) 2026-06-09 16:19:19 Slp: Action is being skipped due to the following restrictions: 
+(01) 2026-06-09 16:19:19 Slp: Condition "Is the datastore flag /Scenario/Patching/IsRunningInnerSetup set" did not pass as it returned true and false was expected.
+(01) 2026-06-09 16:19:19 Slp: ----------------------------------------------------------------------
+(01) 2026-06-09 16:19:19 Slp: Skipping Action: PendingRebootAction
+(01) 2026-06-09 16:19:19 Slp: Action is being skipped due to the following restrictions: 
+(01) 2026-06-09 16:19:19 Slp: Condition "Is the datastore flag /Scenario/Patching/IsRunningInnerSetup set" did not pass as it returned true and false was expected.
+(01) 2026-06-09 16:19:19 Slp: ----------------------------------------------------------------------
+(01) 2026-06-09 16:19:19 Slp: Running Action: NotifyProgressComplete
+(01) 2026-06-09 16:19:19 Slp: Completed Action: NotifyProgressComplete, returned True
+(01) 2026-06-09 16:19:20 Slp: ----------------------------------------------------------------------
+(01) 2026-06-09 16:19:20 Slp: Running Action: DetermineProductFeatureSummary
+(01) 2026-06-09 16:19:20 Slp: Completed Action: DetermineProductFeatureSummary, returned True
+(01) 2026-06-09 16:19:20 Slp: ----------------------------------------------------------------------
+(01) 2026-06-09 16:19:20 Slp: Running Action: FinalizeProgressStatus
+(01) 2026-06-09 16:19:20 Slp: Completed Action: FinalizeProgressStatus, returned True
+(01) 2026-06-09 16:19:20 Slp: ----------------------------------------------------------------------
+(01) 2026-06-09 16:19:20 Slp: Skipping Action: RebootMessageAction
+(01) 2026-06-09 16:19:20 Slp: Action is being skipped due to the following restrictions: 
+(01) 2026-06-09 16:19:20 Slp: Condition "Is the datastore flag /Scenario/Patching/IsRunningInnerSetup set" did not pass as it returned true and false was expected.
+(01) 2026-06-09 16:19:20 Slp: ----------------------------------------------------------------------
+(01) 2026-06-09 16:19:20 Slp: Running Action: CloseUI
+(01) 2026-06-09 16:19:20 Slp: Stop action skipped in UI Mode Quiet
+(01) 2026-06-09 16:19:20 Slp: Completed Action: CloseUI, returned True
+(01) 2026-06-09 16:19:21 Slp: SetupTelemetry: Writing Telemetry to Datastore
+(01) 2026-06-09 16:19:23 Slp: 
+(01) 2026-06-09 16:19:23 Slp: 
+(01) 2026-06-09 16:19:23 Slp: ----------------------------------------------------------------------
+(01) 2026-06-09 16:19:23 Slp: 
+(01) 2026-06-09 16:19:23 Slp: Resultado de error: -2061893606
+(01) 2026-06-09 16:19:23 Slp: CÃ³digo de componente del resultado: 1306
+(01) 2026-06-09 16:19:23 Slp: CÃ³digo de error del resultado: 26
+(01) 2026-06-09 16:19:24 Slp: WER: Application level consent value 'True' was mapped to consent status 'WerConsentApproved'
+(01) 2026-06-09 16:19:26 Slp: WER: Result of the submission:: 'WerReportQueued'
+(01) 2026-06-09 16:19:26 Slp: WER: Submitted 1 of 1 failures to the Watson data repository
+(01) 2026-06-09 16:19:26 Slp: SetupTelemetry: Closing Telemetry Session
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to create base registry key HKEY_LOCAL_MACHINE, machine 
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to open registry subkey SOFTWARE\Microsoft\SQMClient
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to get registry value MachineId
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to create base registry key HKEY_LOCAL_MACHINE, machine 
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to open registry subkey Software\Microsoft\Microsoft SQL Server\160
+(01) 2026-06-09 16:19:26 Slp: SetupTelemetry: Not creating telemetry audit log. Value 'UserRequestedLocalAuditDirectory' doesn't exist in 'HKLM\Software\Microsoft\Microsoft SQL Server\160'
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to create base registry key HKEY_LOCAL_MACHINE, machine 
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to open registry subkey Software\Microsoft\Microsoft SQL Server\160
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to get registry value CustomerFeedback
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to get registry value EnableErrorReporting
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to create base registry key HKEY_LOCAL_MACHINE, machine 
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to open registry subkey Software\Microsoft\Microsoft SQL Server\Instance Names
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to open registry subkey SQL
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to get registry value MSSQLSERVER
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to create base registry key HKEY_LOCAL_MACHINE, machine 
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to open registry subkey Software\Microsoft\Microsoft SQL Server\MSSQL16.MSSQLSERVER\CPE
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to get registry value CustomerFeedback
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to get registry value EnableErrorReporting
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to create base registry key HKEY_LOCAL_MACHINE, machine 
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to open registry subkey Software\Microsoft\Microsoft SQL Server\Instance Names
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to open registry subkey OLAP
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to create base registry key HKEY_LOCAL_MACHINE, machine 
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to open registry subkey Software\Microsoft\Microsoft SQL Server\Instance Names
+(01) 2026-06-09 16:19:26 Slp: Sco: Attempting to open registry subkey RS
+(01) 2026-06-09 16:19:26 Slp: SetupTelemetry: Telemetry has an active session with 30 events.
+File: C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Log\20260609_161614\MSSQLSERVER\sql_engine_core_inst_Cpu64_1.log
+Property(S): SendToFolder = C:\Users\Naciones Unidas\AppData\Roaming\Microsoft\Windows\SendTo\
+Property(S): LogonUser = Naciones Unidas
+Property(S): NetHoodFolder = C:\Users\Naciones Unidas\AppData\Roaming\Microsoft\Windows\Network Shortcuts\
+Property(S): CLIENTPROCESSID = 6540
+Property(S): PrevRegRootPath = Software\Microsoft\Microsoft SQL Server\MSSQL16.MSSQLSERVER
+Property(S): MSICLIENTUSESEXTERNALUI = 1
+Property(S): PreviousInstId = MSSQL16.MSSQLSERVER
+Property(S): CLIENTUILEVEL = 3
+Property(S): SqlOriginalMachineName = USUARIO
+Property(S): InstId = MSSQL16.MSSQLSERVER
+Property(S): CURRENTDIRECTORY = C:\1347fd3f28ae37f7ef0ec130
+Property(S): INSTANCEID = MSSQL16.MSSQLSERVER
+Property(S): EXTERNALMSICONTROL = 1
+Property(S): PATCH = C:\1347fd3f28ae37f7ef0ec130\x64\setup\sql_engine_core_inst.msp
+Property(S): SKIPPENDINGREBOOTCHECK = 1
+Property(S): MSIFASTINSTALL = 7
+Property(S): REBOOT = ReallySuppress
+Property(S): ACTION = INSTALL
+Property(S): Preselected = 1
+Property(S): QFEUpgrade = 2
+Property(S): ERRORREPORTING = True
+Property(S): OriginalDatabase = C:\WINDOWS\Installer\4ab71bd.msi
+Property(S): SQMREPORTING = True
+Property(S): UILevel = 2
+Property(S): DATABASE = C:\WINDOWS\Installer\4ab71bd.msi
+Property(S): INSTANCENAME = MSSQLSERVER
+Property(S): TemplateFolder = C:\ProgramData\Microsoft\Windows\Templates\
+Property(S): PrintHoodFolder = C:\Users\Naciones Unidas\AppData\Roaming\Microsoft\Windows\Printer Shortcuts\
+Property(S): RecentFolder = C:\Users\Naciones Unidas\AppData\Roaming\Microsoft\Windows\Recent\
+Property(S): PersonalFolder = C:\Users\Naciones Unidas\Documents\
+Property(S): CommonAppDataFolder = C:\ProgramData\
+Property(S): LocalAppDataFolder = C:\Users\Naciones Unidas\AppData\Local\
+Property(S): REINSTALL = MPT_AGENT_CORE_CNI,MPT_AGENT_CORE_MNGD_CNI,SQL_AGENT_FNI,SQL_CMDLINETOOLS_CNI,SQL_DATA_COLLECTOR_FNI,SQL_DataFiles_Core_Inst,SQL_DUMPER_CNI,SQL_Engine_CNI,SQL_ENGINE_CORE_CNI,SQL_Engine_Core_Inst,SQL_ENGINE_DB_CNI,SQL_LEGACYTOOLS_CNI,SQL_LEGACYTOOLS_FNI,SQL_MAIL_FNI,SQL_REPL_ENGINE_SUPPORT_CNI,SQL_REPL_ENGINE_SUPPORT_FNI,SQL_SLP_ENGINE_SUPPORT_CNI,SQL_UPGRADESCRIPTS_FNI
+Property(S): COMPANYNAME = HP
+Property(S): RemoteAdminTS = 1
+Property(S): TempFolder = C:\Users\NACION~1\AppData\Local\Temp\
+Property(S): ProductState = 5
+Property(S): RedirectedDllSupport = 2
+Property(S): TRANSFORMS = :SqlRun01.mst;:InstID01.mst;:InstName01.mst
+Property(S): MsiWin32AssemblySupport = 6.3.26100.8328
+Property(S): System64Folder = C:\WINDOWS\system32\
+Property(S): MsiNTProductType = 1
+Property(S): WindowsVolume = C:\
+Property(S): ServicePackLevelMinor = 0
+Property(S): WindowsFolder = C:\WINDOWS\
+Property(S): ServicePackLevel = 0
+Property(S): MsiNTSuitePersonal = 1
+Property(S): AdminToolsFolder = C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Administrative Tools\
+Property(S): ProgramMenuFolder = C:\ProgramData\Microsoft\Windows\Start Menu\Programs\
+Property(S): DesktopFolder = C:\Users\Public\Desktop\
+Property(S): OLEAdvtSupport = 1
+Property(S): ShellAdvtSupport = 1
+Property(S): GPTSupport = 1
+Property(S): FontsFolder = C:\WINDOWS\Fonts\
+Property(S): StartMenuFolder = C:\ProgramData\Microsoft\Windows\Start Menu\
+Property(S): StartupFolder = C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\
+Property(S): PhysicalMemory = 7541
+Property(S): Msix64 = 23
+Property(S): Intel = 23
+Property(S): VirtualMemory = 2503
+Property(S): MsiAMD64 = 23
+Property(S): MsiNetAssemblySupport = 4.8.9221.0
+Property(S): PackageCode = {5B49DA82-36F8-4EB6-AB2D-A9C1633B7DB4}
+Property(S): MyPicturesFolder = C:\Users\Naciones Unidas\Pictures\
+Property(S): Time = 16:19:01
+Property(S): Date = 9/06/2026
+Property(S): TTCSupport = 1
+Property(S): ColorBits = 32
+Property(S): TextInternalLeading = 3
+Property(S): TextHeight = 16
+Property(S): BorderSide = 1
+Property(S): BorderTop = 1
+Property(S): CaptionHeight = 23
+Property(S): _B7C6C72C21944C9192DAF62368E7BCB0.AllowRemoval = 1
+Property(S): _B7C6C72C21944C9192DAF62368E7BCB0.PatchCode = {B7C6C72C-2194-4C91-92DA-F62368E7BCB0}
+Property(S): PATCHNEWPACKAGECODE = {B7C6C72C-2194-4C91-92DA-F62368E7BCB0}
+Property(S): PATCHNEWSUMMARYSUBJECT = Patch for SQL Server Database Services  Core Instance (64-bit)
+Property(S): PATCHNEWSUMMARYCOMMENTS = Hotfix 4255 for SQL Server Database Services  Core Instance (64-bit) (KB5081477)
+Property(S): SQLCOREINST202264Hotfix4255 = C:\1347fd3f28ae37f7ef0ec130\x64\setup\sql_engine_core_inst.msp
+MSI (s) (AC:08) [16:19:01:400]: Producto: SQL Server 2022 Database Engine Services - la actualización "Hotfix 4255 for SQL Server Database Services  Core Instance (64-bit) (KB5081477)" se instaló correctamente.
+
+MSI (s) (AC:08) [16:19:01:400]: Windows Installer instaló una actualización. Nombre del producto: SQL Server 2022 Database Engine Services. Versión del producto: 16.0.1000.6. Idioma del producto: 1033. Fabricante: Microsoft Corporation. Nombre de la actualización: Hotfix 4255 for SQL Server Database Services  Core Instance (64-bit) (KB5081477). Resultado de la instalación: 0.
+
+MSI (s) (AC:08) [16:19:01:400]: Note: 1: 1728 
+MSI (s) (AC:08) [16:19:01:400]: Product: SQL Server 2022 Database Engine Services -- Configuration completed successfully.
+
+MSI (s) (AC:08) [16:19:01:400]: Windows Installer volvió a configurar el producto. Nombre del producto: SQL Server 2022 Database Engine Services. Versión del producto: 16.0.1000.6. Idioma del producto: 1033. Fabricante: Microsoft Corporation. Resultado de la nueva configuración: 0.
+
+MSI (s) (AC:08) [16:19:01:400]: Attempting to delete file C:\WINDOWS\Installer\1a54b1a6.msp
+MSI (s) (AC:08) [16:19:01:448]: Deferring clean up of packages/files, if any exist
+MSI (s) (AC:08) [16:19:01:448]: Attempting to delete file C:\WINDOWS\Installer\1a54b1a6.msp
+MSI (s) (AC:08) [16:19:01:448]: Unable to delete the file outside of the engine. LastError = 2
+MSI (s) (AC:08) [16:19:01:448]: MainEngineThread is returning 0
+MSI (s) (AC:10) [16:19:01:448]: RESTART MANAGER: Session closed.
+MSI (s) (AC:10) [16:19:01:448]: No System Restore sequence number for this installation.
+=== Logging stopped: 9/06/2026  16:19:01 ===
+MSI (s) (AC:10) [16:19:01:465]: User policy value 'DisableRollback' is 0
+MSI (s) (AC:10) [16:19:01:465]: Machine policy value 'DisableRollback' is 0
+MSI (s) (AC:10) [16:19:01:465]: Incrementing counter to disable shutdown. Counter after increment: 0
+MSI (s) (AC:10) [16:19:01:465]: Note: 1: 1402 2: HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Installer\Rollback\Scripts 3: 2 
+MSI (s) (AC:10) [16:19:01:470]: Note: 1: 2265 2:  3: -2147287035 
+MSI (s) (AC:10) [16:19:01:474]: Note: 1: 1402 2: HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Installer\Rollback\Scripts 3: 2 
+MSI (s) (AC:10) [16:19:01:474]: Decrementing counter to disable shutdown. If counter >= 0, shutdown will be denied.  Counter after decrement: -1
+MSI (s) (AC:10) [16:19:01:474]: Post-install cleanup: removing installer file 'C:\WINDOWS\Installer\1a54b0c5.msp'
+MSI (s) (AC:10) [16:19:01:474]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0c5.msp 
+MSI (s) (AC:10) [16:19:01:590]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0c5.msp 
+MSI (s) (AC:10) [16:19:01:795]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0c5.msp 
+MSI (s) (AC:10) [16:19:02:111]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0c5.msp 
+MSI (s) (AC:10) [16:19:02:522]: Post-install cleanup: removing installer file 'C:\WINDOWS\Installer\1a54b0f6.msp'
+MSI (s) (AC:10) [16:19:02:522]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0f6.msp 
+MSI (s) (AC:10) [16:19:02:633]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0f6.msp 
+MSI (s) (AC:10) [16:19:02:838]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0f6.msp 
+MSI (s) (AC:10) [16:19:03:154]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0f6.msp 
+MSI (s) (AC:10) [16:19:03:565]: Post-install cleanup: removing installer file 'C:\WINDOWS\Installer\1a54b1a6.msp'
+MSI (s) (AC:10) [16:19:03:565]: Destroying RemoteAPI object.
+MSI (s) (AC:F8) [16:19:03:565]: Custom Action Manager thread ending.
+MSI (c) (8C:E8) [16:19:03:565]: Decrementing counter to disable shutdown. If counter >= 0, shutdown will be denied.  Counter after decrement: -1
+MSI (c) (8C:E8) [16:19:03:570]: MainEngineThread is returning 0
+=== Verbose logging stopped: 9/06/2026  16:19:03 ===
+
+File: C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Log\20260609_161614\MSSQLSERVER\SqlBrowser_Cpu32_1.log
+Property(S): WindowsBuild = 9600
+Property(S): ServicePackLevel = 0
+Property(S): ServicePackLevelMinor = 0
+Property(S): MsiNTProductType = 1
+Property(S): MsiNTSuitePersonal = 1
+Property(S): WindowsFolder = C:\WINDOWS\
+Property(S): WindowsVolume = C:\
+Property(S): System64Folder = C:\WINDOWS\system32\
+Property(S): SystemFolder = C:\WINDOWS\SysWOW64\
+Property(S): RemoteAdminTS = 1
+Property(S): TempFolder = C:\Users\NACION~1\AppData\Local\Temp\
+Property(S): CommonFilesFolder = C:\Program Files (x86)\Common Files\
+Property(S): ProgramFiles64Folder = C:\Program Files\
+Property(S): CommonFiles64Folder = C:\Program Files\Common Files\
+Property(S): AppDataFolder = C:\Users\Naciones Unidas\AppData\Roaming\
+Property(S): FavoritesFolder = C:\Users\Naciones Unidas\Favorites\
+Property(S): NetHoodFolder = C:\Users\Naciones Unidas\AppData\Roaming\Microsoft\Windows\Network Shortcuts\
+Property(S): PersonalFolder = C:\Users\Naciones Unidas\Documents\
+Property(S): PrintHoodFolder = C:\Users\Naciones Unidas\AppData\Roaming\Microsoft\Windows\Printer Shortcuts\
+Property(S): RecentFolder = C:\Users\Naciones Unidas\AppData\Roaming\Microsoft\Windows\Recent\
+Property(S): SendToFolder = C:\Users\Naciones Unidas\AppData\Roaming\Microsoft\Windows\SendTo\
+Property(S): TemplateFolder = C:\ProgramData\Microsoft\Windows\Templates\
+Property(S): CommonAppDataFolder = C:\ProgramData\
+Property(S): LocalAppDataFolder = C:\Users\Naciones Unidas\AppData\Local\
+Property(S): MyPicturesFolder = C:\Users\Naciones Unidas\Pictures\
+Property(S): AdminToolsFolder = C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Administrative Tools\
+Property(S): StartupFolder = C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\
+Property(S): ProgramMenuFolder = C:\ProgramData\Microsoft\Windows\Start Menu\Programs\
+Property(S): StartMenuFolder = C:\ProgramData\Microsoft\Windows\Start Menu\
+Property(S): DesktopFolder = C:\Users\Public\Desktop\
+Property(S): FontsFolder = C:\WINDOWS\Fonts\
+Property(S): GPTSupport = 1
+Property(S): OLEAdvtSupport = 1
+Property(S): ShellAdvtSupport = 1
+Property(S): MsiAMD64 = 23
+Property(S): Msix64 = 23
+Property(S): Intel = 23
+Property(S): PhysicalMemory = 7541
+Property(S): VirtualMemory = 2453
+Property(S): AdminUser = 1
+Property(S): MsiTrueAdminUser = 1
+Property(S): LogonUser = Naciones Unidas
+Property(S): UserSID = S-1-5-21-505647474-2358236095-2311463443-1001
+Property(S): UserLanguageID = 4106
+Property(S): ComputerName = USUARIO
+Property(S): SystemLanguageID = 2058
+Property(S): ScreenX = 1024
+Property(S): ScreenY = 768
+Property(S): CaptionHeight = 23
+Property(S): BorderTop = 1
+Property(S): BorderSide = 1
+Property(S): TextHeight = 16
+Property(S): TextInternalLeading = 3
+Property(S): ColorBits = 32
+Property(S): TTCSupport = 1
+Property(S): Time = 16:18:40
+Property(S): Date = 9/06/2026
+Property(S): MsiNetAssemblySupport = 4.8.9221.0
+Property(S): MsiWin32AssemblySupport = 6.3.26100.8328
+Property(S): RedirectedDllSupport = 2
+Property(S): MsiRunningElevated = 1
+Property(S): USERNAME = Naciones Unidas
+Property(S): COMPANYNAME = HP
+Property(S): DATABASE = C:\WINDOWS\Installer\4ab71b5.msi
+Property(S): OriginalDatabase = C:\WINDOWS\Installer\4ab71b5.msi
+Property(S): UILevel = 2
+Property(S): QFEUpgrade = 2
+Property(S): Preselected = 1
+Property(S): ACTION = INSTALL
+Property(S): ROOTDRIVE = C:\
+Property(S): CostingComplete = 1
+Property(S): OutOfDiskSpace = 0
+Property(S): OutOfNoRbDiskSpace = 0
+Property(S): PrimaryVolumeSpaceAvailable = 0
+Property(S): PrimaryVolumeSpaceRequired = 0
+Property(S): PrimaryVolumeSpaceRemaining = 0
+Property(S): IsDotNet40Installed = 1
+Property(S): SOURCEDIR = C:\c80aa6d0dcfa029c90\1033_ENU_LP\x64\setup\
+Property(S): SourcedirProduct = {FDB357D5-CC78-480A-8D26-C15D1A877642}
+MSI (s) (AC:CC) [16:18:40:954]: Producto: Browser for SQL Server 2022 - la actualización "Hotfix 4255 for Microsoft SQL Server Browser (KB5081477)" se instaló correctamente.
+
+MSI (s) (AC:CC) [16:18:40:954]: Windows Installer instaló una actualización. Nombre del producto: Browser for SQL Server 2022. Versión del producto: 16.0.1000.6. Idioma del producto: 1033. Fabricante: Microsoft Corporation. Nombre de la actualización: Hotfix 4255 for Microsoft SQL Server Browser (KB5081477). Resultado de la instalación: 0.
+
+MSI (s) (AC:CC) [16:18:40:954]: Note: 1: 1728 
+MSI (s) (AC:CC) [16:18:40:954]: Product: Browser for SQL Server 2022 -- Configuration completed successfully.
+
+MSI (s) (AC:CC) [16:18:40:954]: Windows Installer volvió a configurar el producto. Nombre del producto: Browser for SQL Server 2022. Versión del producto: 16.0.1000.6. Idioma del producto: 1033. Fabricante: Microsoft Corporation. Resultado de la nueva configuración: 0.
+
+MSI (s) (AC:CC) [16:18:40:954]: Attempting to delete file C:\WINDOWS\Installer\1a54b19c.msp
+MSI (s) (AC:CC) [16:18:40:964]: Deferring clean up of packages/files, if any exist
+MSI (s) (AC:CC) [16:18:40:967]: Attempting to delete file C:\WINDOWS\Installer\1a54b19c.msp
+MSI (s) (AC:CC) [16:18:40:967]: Unable to delete the file outside of the engine. LastError = 2
+MSI (s) (AC:CC) [16:18:40:967]: MainEngineThread is returning 0
+MSI (s) (AC:10) [16:18:40:969]: RESTART MANAGER: Session closed.
+MSI (s) (AC:10) [16:18:40:969]: No System Restore sequence number for this installation.
+=== Logging stopped: 9/06/2026  16:18:40 ===
+MSI (s) (AC:10) [16:18:40:971]: User policy value 'DisableRollback' is 0
+MSI (s) (AC:10) [16:18:40:971]: Machine policy value 'DisableRollback' is 0
+MSI (s) (AC:10) [16:18:40:971]: Incrementing counter to disable shutdown. Counter after increment: 0
+MSI (s) (AC:10) [16:18:40:971]: Note: 1: 1402 2: HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Installer\Rollback\Scripts 3: 2 
+MSI (s) (AC:10) [16:18:40:979]: Note: 1: 2265 2:  3: -2147287035 
+MSI (s) (AC:10) [16:18:40:979]: Note: 1: 1402 2: HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Installer\Rollback\Scripts 3: 2 
+MSI (s) (AC:10) [16:18:40:979]: Decrementing counter to disable shutdown. If counter >= 0, shutdown will be denied.  Counter after decrement: -1
+MSI (s) (AC:10) [16:18:40:979]: Post-install cleanup: removing installer file 'C:\WINDOWS\Installer\1a54b0c5.msp'
+MSI (s) (AC:10) [16:18:40:979]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0c5.msp 
+MSI (s) (AC:10) [16:18:41:090]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0c5.msp 
+MSI (s) (AC:10) [16:18:41:296]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0c5.msp 
+MSI (s) (AC:10) [16:18:41:597]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0c5.msp 
+MSI (s) (AC:10) [16:18:42:014]: Post-install cleanup: removing installer file 'C:\WINDOWS\Installer\1a54b0f6.msp'
+MSI (s) (AC:10) [16:18:42:014]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0f6.msp 
+MSI (s) (AC:10) [16:18:42:126]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0f6.msp 
+MSI (s) (AC:10) [16:18:42:335]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0f6.msp 
+MSI (s) (AC:10) [16:18:42:643]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0f6.msp 
+MSI (s) (AC:10) [16:18:43:049]: Post-install cleanup: removing installer file 'C:\WINDOWS\Installer\1a54b19c.msp'
+MSI (s) (AC:10) [16:18:43:049]: Destroying RemoteAPI object.
+MSI (s) (AC:B0) [16:18:43:049]: Custom Action Manager thread ending.
+MSI (c) (8C:F0) [16:18:43:053]: Decrementing counter to disable shutdown. If counter >= 0, shutdown will be denied.  Counter after decrement: -1
+MSI (c) (8C:F0) [16:18:43:057]: MainEngineThread is returning 0
+=== Verbose logging stopped: 9/06/2026  16:18:43 ===
+
+File: C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Log\20260609_161614\MSSQLSERVER\SqlWriter_Cpu64_1.log
+Property(S): ProductState = 5
+Property(S): CLIENTUILEVEL = 3
+Property(S): REINSTALLMODE = omus
+Property(S): WRITER202264Hotfix4255 = C:\1347fd3f28ae37f7ef0ec130\1033_ENU_LP\x64\setup\x64\SqlWriter.msp
+Property(S): MsiNTProductType = 1
+Property(S): MsiNTSuitePersonal = 1
+Property(S): WindowsFolder = C:\WINDOWS\
+Property(S): WindowsVolume = C:\
+Property(S): System64Folder = C:\WINDOWS\system32\
+Property(S): SystemFolder = C:\WINDOWS\SysWOW64\
+Property(S): RemoteAdminTS = 1
+Property(S): TempFolder = C:\Users\NACION~1\AppData\Local\Temp\
+Property(S): CommonFilesFolder = C:\Program Files (x86)\Common Files\
+Property(S): CommonFiles64Folder = C:\Program Files\Common Files\
+Property(S): AppDataFolder = C:\Users\Naciones Unidas\AppData\Roaming\
+Property(S): FavoritesFolder = C:\Users\Naciones Unidas\Favorites\
+Property(S): NetHoodFolder = C:\Users\Naciones Unidas\AppData\Roaming\Microsoft\Windows\Network Shortcuts\
+Property(S): PersonalFolder = C:\Users\Naciones Unidas\Documents\
+Property(S): PrintHoodFolder = C:\Users\Naciones Unidas\AppData\Roaming\Microsoft\Windows\Printer Shortcuts\
+Property(S): RecentFolder = C:\Users\Naciones Unidas\AppData\Roaming\Microsoft\Windows\Recent\
+Property(S): SendToFolder = C:\Users\Naciones Unidas\AppData\Roaming\Microsoft\Windows\SendTo\
+Property(S): TemplateFolder = C:\ProgramData\Microsoft\Windows\Templates\
+Property(S): CommonAppDataFolder = C:\ProgramData\
+Property(S): LocalAppDataFolder = C:\Users\Naciones Unidas\AppData\Local\
+Property(S): MyPicturesFolder = C:\Users\Naciones Unidas\Pictures\
+Property(S): AdminToolsFolder = C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Administrative Tools\
+Property(S): StartupFolder = C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\
+Property(S): ProgramMenuFolder = C:\ProgramData\Microsoft\Windows\Start Menu\Programs\
+Property(S): StartMenuFolder = C:\ProgramData\Microsoft\Windows\Start Menu\
+Property(S): DesktopFolder = C:\Users\Public\Desktop\
+Property(S): FontsFolder = C:\WINDOWS\Fonts\
+Property(S): GPTSupport = 1
+Property(S): OLEAdvtSupport = 1
+Property(S): ShellAdvtSupport = 1
+Property(S): MsiAMD64 = 23
+Property(S): Msix64 = 23
+Property(S): Intel = 23
+Property(S): PhysicalMemory = 7541
+Property(S): VirtualMemory = 2563
+Property(S): AdminUser = 1
+Property(S): MsiTrueAdminUser = 1
+Property(S): LogonUser = Naciones Unidas
+Property(S): UserSID = S-1-5-21-505647474-2358236095-2311463443-1001
+Property(S): UserLanguageID = 4106
+Property(S): ComputerName = USUARIO
+Property(S): SystemLanguageID = 2058
+Property(S): ScreenX = 1024
+Property(S): ScreenY = 768
+Property(S): CaptionHeight = 23
+Property(S): BorderTop = 1
+Property(S): BorderSide = 1
+Property(S): TextHeight = 16
+Property(S): TextInternalLeading = 3
+Property(S): ColorBits = 32
+Property(S): TTCSupport = 1
+Property(S): Time = 16:18:36
+Property(S): Date = 9/06/2026
+Property(S): MsiNetAssemblySupport = 4.8.9221.0
+Property(S): MsiWin32AssemblySupport = 6.3.26100.8328
+Property(S): RedirectedDllSupport = 2
+Property(S): MsiRunningElevated = 1
+Property(S): USERNAME = Naciones Unidas
+Property(S): COMPANYNAME = HP
+Property(S): DATABASE = C:\WINDOWS\Installer\4ab71b1.msi
+Property(S): UILevel = 2
+Property(S): OriginalDatabase = C:\WINDOWS\Installer\4ab71b1.msi
+Property(S): QFEUpgrade = 2
+Property(S): Preselected = 1
+Property(S): ACTION = INSTALL
+Property(S): ROOTDRIVE = C:\
+Property(S): CostingComplete = 1
+Property(S): OutOfDiskSpace = 0
+Property(S): OutOfNoRbDiskSpace = 0
+Property(S): PrimaryVolumeSpaceAvailable = 0
+Property(S): PrimaryVolumeSpaceRequired = 0
+Property(S): PrimaryVolumeSpaceRemaining = 0
+Property(S): IsDotNet40Installed = 1
+Property(S): SOURCEDIR = C:\c80aa6d0dcfa029c90\1033_ENU_LP\x64\setup\x64\
+Property(S): SourcedirProduct = {AB5D8778-81F3-47E2-87A4-35E776CD664B}
+MSI (s) (AC:C4) [16:18:36:068]: Producto: Microsoft VSS Writer for SQL Server 2022 - la actualización "Hotfix 4255 for Microsoft SQL Server VSS Writer (64-bit) (KB5081477)" se instaló correctamente.
+
+MSI (s) (AC:C4) [16:18:36:068]: Windows Installer instaló una actualización. Nombre del producto: Microsoft VSS Writer for SQL Server 2022. Versión del producto: 16.0.1000.6. Idioma del producto: 1033. Fabricante: Microsoft Corporation. Nombre de la actualización: Hotfix 4255 for Microsoft SQL Server VSS Writer (64-bit) (KB5081477). Resultado de la instalación: 0.
+
+MSI (s) (AC:C4) [16:18:36:068]: Note: 1: 1728 
+MSI (s) (AC:C4) [16:18:36:068]: Product: Microsoft VSS Writer for SQL Server 2022 -- Configuration completed successfully.
+
+MSI (s) (AC:C4) [16:18:36:068]: Windows Installer volvió a configurar el producto. Nombre del producto: Microsoft VSS Writer for SQL Server 2022. Versión del producto: 16.0.1000.6. Idioma del producto: 1033. Fabricante: Microsoft Corporation. Resultado de la nueva configuración: 0.
+
+MSI (s) (AC:C4) [16:18:36:068]: Attempting to delete file C:\WINDOWS\Installer\1a54b190.msp
+MSI (s) (AC:C4) [16:18:36:102]: Deferring clean up of packages/files, if any exist
+MSI (s) (AC:C4) [16:18:36:102]: Attempting to delete file C:\WINDOWS\Installer\1a54b190.msp
+MSI (s) (AC:C4) [16:18:36:102]: Unable to delete the file outside of the engine. LastError = 2
+MSI (s) (AC:C4) [16:18:36:102]: MainEngineThread is returning 0
+MSI (s) (AC:10) [16:18:36:102]: RESTART MANAGER: Session closed.
+MSI (s) (AC:10) [16:18:36:102]: No System Restore sequence number for this installation.
+=== Logging stopped: 9/06/2026  16:18:36 ===
+MSI (s) (AC:10) [16:18:36:116]: User policy value 'DisableRollback' is 0
+MSI (s) (AC:10) [16:18:36:116]: Machine policy value 'DisableRollback' is 0
+MSI (s) (AC:10) [16:18:36:116]: Incrementing counter to disable shutdown. Counter after increment: 0
+MSI (s) (AC:10) [16:18:36:116]: Note: 1: 1402 2: HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Installer\Rollback\Scripts 3: 2 
+MSI (s) (AC:10) [16:18:36:116]: Note: 1: 2265 2:  3: -2147287035 
+MSI (s) (AC:10) [16:18:36:116]: Note: 1: 1402 2: HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Installer\Rollback\Scripts 3: 2 
+MSI (s) (AC:10) [16:18:36:116]: Decrementing counter to disable shutdown. If counter >= 0, shutdown will be denied.  Counter after decrement: -1
+MSI (s) (AC:10) [16:18:36:116]: Post-install cleanup: removing installer file 'C:\WINDOWS\Installer\1a54b0c5.msp'
+MSI (s) (AC:10) [16:18:36:116]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0c5.msp 
+MSI (s) (AC:10) [16:18:36:229]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0c5.msp 
+MSI (s) (AC:10) [16:18:36:438]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0c5.msp 
+MSI (s) (AC:10) [16:18:36:744]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0c5.msp 
+MSI (s) (AC:10) [16:18:37:147]: Post-install cleanup: removing installer file 'C:\WINDOWS\Installer\1a54b0f6.msp'
+MSI (s) (AC:10) [16:18:37:147]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0f6.msp 
+MSI (s) (AC:10) [16:18:37:258]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0f6.msp 
+MSI (s) (AC:10) [16:18:37:463]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0f6.msp 
+MSI (s) (AC:10) [16:18:37:778]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0f6.msp 
+MSI (s) (AC:10) [16:18:38:190]: Post-install cleanup: removing installer file 'C:\WINDOWS\Installer\1a54b190.msp'
+MSI (s) (AC:10) [16:18:38:190]: Destroying RemoteAPI object.
+MSI (s) (AC:F8) [16:18:38:190]: Custom Action Manager thread ending.
+MSI (c) (8C:D4) [16:18:38:190]: Decrementing counter to disable shutdown. If counter >= 0, shutdown will be denied.  Counter after decrement: -1
+MSI (c) (8C:D4) [16:18:38:190]: MainEngineThread is returning 0
+=== Verbose logging stopped: 9/06/2026  16:18:38 ===
+
+File: C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Log\20260609_161614\MSSQLSERVER\msodbcsql_Cpu64_1.log
+Property(S): CLIENTUILEVEL = 3
+Property(S): MSICLIENTUSESEXTERNALUI = 1
+Property(S): CLIENTPROCESSID = 6540
+Property(S): VersionDatabase = 405
+Property(S): MsiSystemRebootPending = 1
+Property(S): VersionMsi = 5.00
+Property(S): VersionNT64 = 603
+Property(S): WindowsBuild = 9600
+Property(S): ServicePackLevel = 0
+Property(S): ServicePackLevelMinor = 0
+Property(S): MsiNTProductType = 1
+Property(S): MsiNTSuitePersonal = 1
+Property(S): WindowsVolume = C:\
+Property(S): RemoteAdminTS = 1
+Property(S): TempFolder = C:\Users\NACION~1\AppData\Local\Temp\
+Property(S): CommonFilesFolder = C:\Program Files (x86)\Common Files\
+Property(S): CommonFiles64Folder = C:\Program Files\Common Files\
+Property(S): AppDataFolder = C:\Users\Naciones Unidas\AppData\Roaming\
+Property(S): FavoritesFolder = C:\Users\Naciones Unidas\Favorites\
+Property(S): NetHoodFolder = C:\Users\Naciones Unidas\AppData\Roaming\Microsoft\Windows\Network Shortcuts\
+Property(S): PersonalFolder = C:\Users\Naciones Unidas\Documents\
+Property(S): PrintHoodFolder = C:\Users\Naciones Unidas\AppData\Roaming\Microsoft\Windows\Printer Shortcuts\
+Property(S): RecentFolder = C:\Users\Naciones Unidas\AppData\Roaming\Microsoft\Windows\Recent\
+Property(S): SendToFolder = C:\Users\Naciones Unidas\AppData\Roaming\Microsoft\Windows\SendTo\
+Property(S): TemplateFolder = C:\ProgramData\Microsoft\Windows\Templates\
+Property(S): CommonAppDataFolder = C:\ProgramData\
+Property(S): LocalAppDataFolder = C:\Users\Naciones Unidas\AppData\Local\
+Property(S): MyPicturesFolder = C:\Users\Naciones Unidas\Pictures\
+Property(S): AdminToolsFolder = C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Administrative Tools\
+Property(S): StartupFolder = C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\
+Property(S): ProgramMenuFolder = C:\ProgramData\Microsoft\Windows\Start Menu\Programs\
+Property(S): StartMenuFolder = C:\ProgramData\Microsoft\Windows\Start Menu\
+Property(S): DesktopFolder = C:\Users\Public\Desktop\
+Property(S): FontsFolder = C:\WINDOWS\Fonts\
+Property(S): GPTSupport = 1
+Property(S): OLEAdvtSupport = 1
+Property(S): ShellAdvtSupport = 1
+Property(S): MsiAMD64 = 23
+Property(S): Msix64 = 23
+Property(S): Intel = 23
+Property(S): PhysicalMemory = 7541
+Property(S): VirtualMemory = 2554
+Property(S): AdminUser = 1
+Property(S): MsiTrueAdminUser = 1
+Property(S): LogonUser = Naciones Unidas
+Property(S): UserSID = S-1-5-21-505647474-2358236095-2311463443-1001
+Property(S): UserLanguageID = 4106
+Property(S): ComputerName = USUARIO
+Property(S): SystemLanguageID = 2058
+Property(S): ScreenX = 1024
+Property(S): ScreenY = 768
+Property(S): CaptionHeight = 23
+Property(S): BorderTop = 1
+Property(S): BorderSide = 1
+Property(S): TextHeight = 16
+Property(S): TextInternalLeading = 3
+Property(S): ColorBits = 32
+Property(S): TTCSupport = 1
+Property(S): Time = 16:18:28
+Property(S): Date = 9/06/2026
+Property(S): MsiNetAssemblySupport = 4.8.9221.0
+Property(S): MsiWin32AssemblySupport = 6.3.26100.8328
+Property(S): RedirectedDllSupport = 2
+Property(S): MsiRunningElevated = 1
+Property(S): USERNAME = Naciones Unidas
+Property(S): COMPANYNAME = HP
+Property(S): DATABASE = C:\WINDOWS\Installer\1a54b172.msi
+Property(S): OriginalDatabase = C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Update Cache\KB5081477\QFE\1033_ENU_LP\x64\setup\x64\msodbcsql.msi
+Property(S): UILevel = 2
+Property(S): Preselected = 1
+Property(S): ACTION = INSTALL
+Property(S): MIGRATE = {72AFAF21-33FB-45A5-9468-A9EC07427F82}
+Property(S): ROOTDRIVE = C:\
+Property(S): CostingComplete = 1
+Property(S): OutOfDiskSpace = 0
+Property(S): OutOfNoRbDiskSpace = 0
+Property(S): PrimaryVolumeSpaceAvailable = 0
+Property(S): PrimaryVolumeSpaceRequired = 0
+Property(S): PrimaryVolumeSpaceRemaining = 0
+Property(S): SOURCEDIR = C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Update Cache\KB5081477\QFE\1033_ENU_LP\x64\setup\x64\
+Property(S): SourcedirProduct = {0E0F96AC-80DE-4400-A40C-429D63293651}
+Property(S): ProductToBeRegistered = 1
+MSI (s) (AC:34) [16:18:28:850]: Note: 1: 1707 
+MSI (s) (AC:34) [16:18:28:850]: Product: Microsoft ODBC Driver 17 for SQL Server -- Installation completed successfully.
+
+MSI (s) (AC:34) [16:18:28:850]: Windows Installer instaló el producto. Nombre del producto: Microsoft ODBC Driver 17 for SQL Server. Versión del producto: 17.10.6.1. Idioma del producto: 1033. Fabricante: Microsoft Corporation. Resultado de la instalación: 0.
+
+MSI (s) (AC:34) [16:18:30:915]: Deferring clean up of packages/files, if any exist
+MSI (s) (AC:34) [16:18:30:915]: MainEngineThread is returning 0
+MSI (s) (AC:10) [16:18:30:919]: RESTART MANAGER: Session closed.
+MSI (s) (AC:10) [16:18:30:921]: RESTART MANAGER: Session closed.
+MSI (s) (AC:10) [16:18:30:921]: No System Restore sequence number for this installation.
+=== Logging stopped: 9/06/2026  16:18:28 ===
+MSI (s) (AC:10) [16:18:30:936]: User policy value 'DisableRollback' is 0
+MSI (s) (AC:10) [16:18:30:936]: Machine policy value 'DisableRollback' is 0
+MSI (s) (AC:10) [16:18:30:936]: Incrementing counter to disable shutdown. Counter after increment: 0
+MSI (s) (AC:10) [16:18:30:936]: Note: 1: 1402 2: HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Installer\Rollback\Scripts 3: 2 
+MSI (s) (AC:10) [16:18:30:947]: Note: 1: 2265 2:  3: -2147287035 
+MSI (s) (AC:10) [16:18:30:947]: Note: 1: 1402 2: HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Installer\Rollback\Scripts 3: 2 
+MSI (s) (AC:10) [16:18:30:947]: Decrementing counter to disable shutdown. If counter >= 0, shutdown will be denied.  Counter after decrement: -1
+MSI (s) (AC:10) [16:18:30:947]: Post-install cleanup: removing installer file 'C:\WINDOWS\Installer\1a54b0c5.msp'
+MSI (s) (AC:10) [16:18:30:947]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0c5.msp 
+MSI (s) (AC:10) [16:18:31:059]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0c5.msp 
+MSI (s) (AC:10) [16:18:31:271]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0c5.msp 
+MSI (s) (AC:10) [16:18:31:577]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0c5.msp 
+MSI (s) (AC:10) [16:18:31:989]: Post-install cleanup: removing installer file 'C:\WINDOWS\Installer\1a54b0f6.msp'
+MSI (s) (AC:10) [16:18:31:989]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0f6.msp 
+MSI (s) (AC:10) [16:18:32:101]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0f6.msp 
+MSI (s) (AC:10) [16:18:32:311]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0f6.msp 
+MSI (s) (AC:10) [16:18:32:619]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0f6.msp 
+MSI (s) (AC:10) [16:18:33:022]: Post-install cleanup: removing installer file 'C:\WINDOWS\Installer\4ab71ad.msi'
+MSI (s) (AC:10) [16:18:33:038]: Post-install cleanup: removing installer file 'C:\WINDOWS\Installer\{72AFAF21-33FB-45A5-9468-A9EC07427F82}\ARPIco'
+MSI (s) (AC:10) [16:18:33:038]: Post-install cleanup: removing installer folder 'C:\WINDOWS\Installer\{72AFAF21-33FB-45A5-9468-A9EC07427F82}\' (if empty)
+MSI (s) (AC:10) [16:18:33:038]: Note: 1: 2318 2:  
+MSI (s) (AC:10) [16:18:33:038]: Destroying RemoteAPI object.
+MSI (s) (AC:60) [16:18:33:038]: Custom Action Manager thread ending.
+MSI (c) (8C:28) [16:18:33:046]: Decrementing counter to disable shutdown. If counter >= 0, shutdown will be denied.  Counter after decrement: -1
+MSI (c) (8C:28) [16:18:33:046]: MainEngineThread is returning 0
+=== Verbose logging stopped: 9/06/2026  16:18:33 ===
+
+File: C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Log\20260609_161614\MSSQLSERVER\sql_engine_core_shared_Cpu64_1.log
+Property(S): CURRENTDIRECTORY = C:\1347fd3f28ae37f7ef0ec130
+Property(S): MsiSystemRebootPending = 1
+Property(S): SqlOriginalMachineName = USUARIO
+Property(S): ERRORREPORTING = True
+Property(S): RedirectedDllSupport = 2
+Property(S): SQMREPORTING = True
+Property(S): MsiWin32AssemblySupport = 6.3.26100.8328
+Property(S): Privileged = 1
+Property(S): REINSTALL = SDK_CNS,SQL_BROWSER_CNS,SQL_CMDLINETOOLS_CNS,SQL_DATA_COLLECTOR_FNS,SQL_DMF_CNS,SQL_DUMPER_CNS,SQL_Engine_CNS,SQL_ENGINE_CORE_CNS,SQL_Engine_Core_Shared,SQL_Engine_FNS,SQL_LEGACYTOOLS_CNS,SQL_PowerShell_Engine_CNS,SQL_REPL_ENGINE_SUPPORT_FNS,SQL_SCHEMAS_CNS,SQL_SLP_BASE_CNS,SQL_SLP_ENGINE_SUPPORT_CNS
+Property(S): MsiNetAssemblySupport = 4.8.9221.0
+Property(S): Date = 9/06/2026
+Property(S): ProductToBeRegistered = 1
+Property(S): REINSTALLMODE = omus
+Property(S): Time = 16:18:22
+Property(S): ProductState = 5
+Property(S): TTCSupport = 1
+Property(S): COMPANYNAME = HP
+Property(S): MSIFASTINSTALL = 7
+Property(S): TemplateFolder = C:\ProgramData\Microsoft\Windows\Templates\
+Property(S): SKIPPENDINGREBOOTCHECK = 1
+Property(S): DATABASE = C:\WINDOWS\Installer\4ab71a1.msi
+Property(S): USERNAME = Naciones Unidas
+Property(S): PATCH = C:\1347fd3f28ae37f7ef0ec130\x64\setup\sql_engine_core_shared.msp
+Property(S): UILevel = 2
+Property(S): ServicePackLevel = 0
+Property(S): EXTERNALMSICONTROL = 1
+Property(S): OriginalDatabase = C:\WINDOWS\Installer\4ab71a1.msi
+Property(S): LocalAppDataFolder = C:\Users\Naciones Unidas\AppData\Local\
+Property(S): MsiNTProductType = 1
+Property(S): MyPicturesFolder = C:\Users\Naciones Unidas\Pictures\
+Property(S): ServicePackLevelMinor = 0
+Property(S): WindowsBuild = 9600
+Property(S): MsiNTSuitePersonal = 1
+Property(S): PersonalFolder = C:\Users\Naciones Unidas\Documents\
+Property(S): CLIENTUILEVEL = 3
+Property(S): Preselected = 1
+Property(S): QFEUpgrade = 2
+Property(S): PRODUCTLANGUAGE = 1033
+Property(S): ROOTDRIVE = C:\
+Property(S): CommonAppDataFolder = C:\ProgramData\
+Property(S): VersionMsi = 5.00
+Property(S): VersionDatabase = 405
+Property(S): PackageCode = {A2FBEA58-6F46-4649-811D-8B344898E2CC}
+Property(S): ColorBits = 32
+Property(S): MsiLogFileLocation = C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Log\20260609_161614\MSSQLSERVER\sql_engine_core_shared_Cpu64_1.log
+Property(S): TextInternalLeading = 3
+Property(S): TextHeight = 16
+Property(S): BorderSide = 1
+Property(S): GPTSupport = 1
+Property(S): PrintHoodFolder = C:\Users\Naciones Unidas\AppData\Roaming\Microsoft\Windows\Printer Shortcuts\
+Property(S): FavoritesFolder = C:\Users\Naciones Unidas\Favorites\
+Property(S): NetHoodFolder = C:\Users\Naciones Unidas\AppData\Roaming\Microsoft\Windows\Network Shortcuts\
+Property(S): StartMenuFolder = C:\ProgramData\Microsoft\Windows\Start Menu\
+Property(S): ProgramMenuFolder = C:\ProgramData\Microsoft\Windows\Start Menu\Programs\
+Property(S): DesktopFolder = C:\Users\Public\Desktop\
+Property(S): LogonUser = Naciones Unidas
+Property(S): RecentFolder = C:\Users\Naciones Unidas\AppData\Roaming\Microsoft\Windows\Recent\
+Property(S): CommonFilesFolder = C:\Program Files (x86)\Common Files\
+Property(S): MsiTrueAdminUser = 1
+Property(S): AdminUser = 1
+Property(S): SendToFolder = C:\Users\Naciones Unidas\AppData\Roaming\Microsoft\Windows\SendTo\
+Property(S): StartupFolder = C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\
+Property(S): FontsFolder = C:\WINDOWS\Fonts\
+Property(S): VirtualMemory = 2571
+Property(S): PhysicalMemory = 7541
+Property(S): Msix64 = 23
+Property(S): MsiAMD64 = 23
+Property(S): ShellAdvtSupport = 1
+Property(S): Intel = 23
+Property(S): OLEAdvtSupport = 1
+Property(S): UserLanguageID = 4106
+Property(S): CaptionHeight = 23
+Property(S): BorderTop = 1
+Property(S): ScreenY = 768
+Property(S): SQLCORESHARED202264Hotfix4255 = C:\1347fd3f28ae37f7ef0ec130\x64\setup\sql_engine_core_shared.msp
+Property(S): SOURCEDIR = C:\c80aa6d0dcfa029c90\x64\setup\
+Property(S): SourcedirProduct = {D6E82158-05B9-4A18-A624-EA135BC77766}
+Property(S): InstallNgenTicks = 790000
+Property(S): FeatureList = SQL_Engine_Core_Shared=3 SDK_CNS=3 SQL_BROWSER_CNS=3 SQL_CMDLINETOOLS_CNS=3 SQL_Engine_CNS=3 SQL_ENGINE_CORE_CNS=3 SQL_LEGACYTOOLS_CNS=3 SQL_SCHEMAS_CNS=3 SQL_SLP_BASE_CNS=3 SQL_PowerShell_Engine_CNS=3 MPT_AGENT_CORE_CNS=3 SQL_DATA_COLLECTOR_FNS=3 SQL_REPL_ENGINE_SUPPORT_FNS=3
+MSI (s) (AC:AC) [16:18:22:263]: Producto: SQL Server 2022 Database Engine Shared - la actualización "Hotfix 4255 for SQL Server Database Services  Core Shared (64-bit) (KB5081477)" se instaló correctamente.
+
+MSI (s) (AC:AC) [16:18:22:263]: Windows Installer instaló una actualización. Nombre del producto: SQL Server 2022 Database Engine Shared. Versión del producto: 16.0.1000.6. Idioma del producto: 1033. Fabricante: Microsoft Corporation. Nombre de la actualización: Hotfix 4255 for SQL Server Database Services  Core Shared (64-bit) (KB5081477). Resultado de la instalación: 0.
+
+MSI (s) (AC:AC) [16:18:22:263]: Note: 1: 1728 
+MSI (s) (AC:AC) [16:18:22:263]: Product: SQL Server 2022 Database Engine Shared -- Configuration completed successfully.
+
+MSI (s) (AC:AC) [16:18:22:279]: Windows Installer volvió a configurar el producto. Nombre del producto: SQL Server 2022 Database Engine Shared. Versión del producto: 16.0.1000.6. Idioma del producto: 1033. Fabricante: Microsoft Corporation. Resultado de la nueva configuración: 0.
+
+MSI (s) (AC:AC) [16:18:22:279]: Attempting to delete file C:\WINDOWS\Installer\1a54b0f6.msp
+MSI (s) (AC:AC) [16:18:22:279]: Unable to delete the file. LastError = 32
+MSI (s) (AC:AC) [16:18:22:344]: Deferring clean up of packages/files, if any exist
+MSI (s) (AC:AC) [16:18:22:344]: Attempting to delete file C:\WINDOWS\Installer\1a54b0f6.msp
+MSI (s) (AC:AC) [16:18:22:344]: Unable to delete the file outside of the engine. LastError = 32
+MSI (s) (AC:AC) [16:18:22:344]: MainEngineThread is returning 0
+MSI (s) (AC:10) [16:18:22:344]: RESTART MANAGER: Session closed.
+MSI (s) (AC:10) [16:18:22:344]: No System Restore sequence number for this installation.
+=== Logging stopped: 9/06/2026  16:18:22 ===
+MSI (s) (AC:10) [16:18:22:360]: User policy value 'DisableRollback' is 0
+MSI (s) (AC:10) [16:18:22:360]: Machine policy value 'DisableRollback' is 0
+MSI (s) (AC:10) [16:18:22:360]: Incrementing counter to disable shutdown. Counter after increment: 0
+MSI (s) (AC:10) [16:18:22:360]: Note: 1: 1402 2: HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Installer\Rollback\Scripts 3: 2 
+MSI (s) (AC:10) [16:18:22:360]: Note: 1: 2265 2:  3: -2147287035 
+MSI (s) (AC:10) [16:18:22:360]: Note: 1: 1402 2: HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Installer\Rollback\Scripts 3: 2 
+MSI (s) (AC:10) [16:18:22:360]: Decrementing counter to disable shutdown. If counter >= 0, shutdown will be denied.  Counter after decrement: -1
+MSI (s) (AC:10) [16:18:22:360]: Post-install cleanup: removing installer file 'C:\WINDOWS\Installer\1a54b0c5.msp'
+MSI (s) (AC:10) [16:18:22:360]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0c5.msp 
+MSI (s) (AC:10) [16:18:22:471]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0c5.msp 
+MSI (s) (AC:10) [16:18:22:681]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0c5.msp 
+MSI (s) (AC:10) [16:18:22:988]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0c5.msp 
+MSI (s) (AC:10) [16:18:23:393]: Post-install cleanup: removing installer file 'C:\WINDOWS\Installer\1a54b0f6.msp'
+MSI (s) (AC:10) [16:18:23:393]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0f6.msp 
+MSI (s) (AC:10) [16:18:23:506]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0f6.msp 
+MSI (s) (AC:10) [16:18:23:715]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0f6.msp 
+MSI (s) (AC:10) [16:18:24:022]: Note: 1: 2329 2: 32 3: C:\WINDOWS\Installer\1a54b0f6.msp 
+MSI (s) (AC:10) [16:18:24:426]: Destroying RemoteAPI object.
+MSI (s) (AC:F4) [16:18:24:426]: Custom Action Manager thread ending.
+MSI (c) (8C:F4) [16:18:24:432]: Decrementing counter to disable shutdown. If counter >= 0, shutdown will be denied.  Counter after decrement: -1
+MSI (c) (8C:F4) [16:18:24:434]: MainEngineThread is returning 0
+=== Verbose logging stopped: 9/06/2026  16:18:24 ===
+
+
+================================================================================
+Latest Backend Logs
+================================================================================
+
+================================================================================
+Latest Frontend Logs
+================================================================================
+
+================================================================================
+Recent ParqueRM Windows Events
+================================================================================
+
+
+TimeCreated  : 9/06/2026 16:19:28
+ProviderName : Windows Error Reporting
+Id           : 1001
+Message      : Depósito con errores 1434001905964408779, tipo 5
+               Nombre de evento: SQL160Exception
+               Respuesta: No disponible
+               Identificador de archivo CAB: 0
+               
+               Firma del problema:
+               P1: SQL Server 2022@RTM@KB5081477
+               P2: 0xD15B4EB2
+               P3: 0xD15B4EB2
+               P4: 0x4BDAF9BA@1306@26
+               P5: 0x4BDAF9BA@1306@26
+               P6: SqlEngineConfigAction_patch_configrc
+               P7: 0x94D05575
+               P8: Unknown
+               P9: Unknown
+               P10: 
+               
+               Archivos adjuntos:
+               \\?\C:\Program Files\Microsoft SQL Server\160\Setup 
+               Bootstrap\Log\20260609_161614\MSSQLSERVER\Watson_1\LogFiles.cab
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.d286661f-683c-43a6-a9f1-4b6c564ee272.tmp.WERInternalMe
+               tadata.xml
+               \\?\C:\ProgramData\Microsoft\Windows\WER\ReportQueue\Critical_SQL Server 2022@_514d77f7f6aecc4125898895b
+               47ac84ee2a9b794_00000000_cab_f773b305-2860-480c-b3c5-e2c228188fab\WPR_initiated_DiagTrackMiniLogger_OneT
+               race_User_Logger_20260424_1_EC_0_inject.etl
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.7b7c32a1-c611-4cc3-8536-53411fb7decb.tmp.etl
+               \\?\C:\ProgramData\Microsoft\Windows\WER\ReportQueue\Critical_SQL Server 2022@_514d77f7f6aecc4125898895b
+               47ac84ee2a9b794_00000000_cab_f773b305-2860-480c-b3c5-e2c228188fab\WPR_initiated_DiagTrackMiniLogger_WPR 
+               System Collector_inject.etl
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.a19b23f4-e6d1-4dba-8046-83fa3a22585a.tmp.etl
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.e2bfee8b-71e7-490d-a876-17edf2d5d9d8.tmp.csv
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.a8acfe23-83bf-4cde-b622-6c1a1a73298b.tmp.txt
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.d9aa326d-2d7b-41ca-913e-22336083847c.tmp.xml
+               
+               Es posible que estos archivos estén disponibles aquí:
+               \\?\C:\ProgramData\Microsoft\Windows\WER\ReportArchive\Critical_SQL Server 
+               2022@_514d77f7f6aecc4125898895b47ac84ee2a9b794_00000000_f773b305-2860-480c-b3c5-e2c228188fab
+               
+               Símbolo de análisis: 
+               Nueva búsqueda de una solución: 0
+               Identificador de informe: f773b305-2860-480c-b3c5-e2c228188fab
+               Estado del informe: 268435456
+               Depósito con algoritmo hash: e3d2d1a69d5501ad63e69922c43ddfcb
+               GUID de CAB: 0
+
+TimeCreated  : 9/06/2026 16:19:26
+ProviderName : Windows Error Reporting
+Id           : 1001
+Message      : Depósito con errores , tipo 0
+               Nombre de evento: SQL160Exception
+               Respuesta: No disponible
+               Identificador de archivo CAB: 0
+               
+               Firma del problema:
+               P1: SQL Server 2022@RTM@KB5081477
+               P2: 0xD15B4EB2
+               P3: 0xD15B4EB2
+               P4: 0x4BDAF9BA@1306@26
+               P5: 0x4BDAF9BA@1306@26
+               P6: SqlEngineConfigAction_patch_configrc
+               P7: 0x94D05575
+               P8: Unknown
+               P9: Unknown
+               P10: 
+               
+               Archivos adjuntos:
+               \\?\C:\Program Files\Microsoft SQL Server\160\Setup 
+               Bootstrap\Log\20260609_161614\MSSQLSERVER\Watson_1\LogFiles.cab
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.d286661f-683c-43a6-a9f1-4b6c564ee272.tmp.WERInternalMe
+               tadata.xml
+               \\?\C:\ProgramData\Microsoft\Windows\WER\ReportQueue\Critical_SQL Server 2022@_514d77f7f6aecc4125898895b
+               47ac84ee2a9b794_00000000_cab_f773b305-2860-480c-b3c5-e2c228188fab\WPR_initiated_DiagTrackMiniLogger_OneT
+               race_User_Logger_20260424_1_EC_0_inject.etl
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.7b7c32a1-c611-4cc3-8536-53411fb7decb.tmp.etl
+               \\?\C:\ProgramData\Microsoft\Windows\WER\ReportQueue\Critical_SQL Server 2022@_514d77f7f6aecc4125898895b
+               47ac84ee2a9b794_00000000_cab_f773b305-2860-480c-b3c5-e2c228188fab\WPR_initiated_DiagTrackMiniLogger_WPR 
+               System Collector_inject.etl
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.a19b23f4-e6d1-4dba-8046-83fa3a22585a.tmp.etl
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.e2bfee8b-71e7-490d-a876-17edf2d5d9d8.tmp.csv
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.a8acfe23-83bf-4cde-b622-6c1a1a73298b.tmp.txt
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.d9aa326d-2d7b-41ca-913e-22336083847c.tmp.xml
+               
+               Es posible que estos archivos estén disponibles aquí:
+               \\?\C:\ProgramData\Microsoft\Windows\WER\ReportQueue\Critical_SQL Server 
+               2022@_514d77f7f6aecc4125898895b47ac84ee2a9b794_00000000_cab_f773b305-2860-480c-b3c5-e2c228188fab
+               
+               Símbolo de análisis: 
+               Nueva búsqueda de una solución: 0
+               Identificador de informe: f773b305-2860-480c-b3c5-e2c228188fab
+               Estado del informe: 4
+               Depósito con algoritmo hash: 
+               GUID de CAB: 0
+
+TimeCreated  : 9/06/2026 16:19:20
+ProviderName : Windows Error Reporting
+Id           : 1001
+Message      : Depósito con errores INVALID_REQUEST, tipo 0
+               Nombre de evento: SQLException64
+               Respuesta: No disponible
+               Identificador de archivo CAB: 0
+               
+               Firma del problema:
+               P1: sqlservr.exe
+               P2: 0.0.0.0
+               P3: 0000000000000000
+               P4: sqllang.dll
+               P5: 2022.160.4255.1
+               P6: 0000000069EB153C
+               P7: 17068
+               P8: 00000000003D8946
+               P9: 0000000000000000
+               P10: 00670595-1ae3-4dca-a0cc-fafb89b6b0ba
+               
+               Archivos adjuntos:
+               \\?\C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\SQLDmpr0014.P3712.00000000.T2026
+               0609221914.{00670595-1ae3-4dca-a0cc-fafb89b6b0ba}.dmp
+               \\?\C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\SQLDump0014.log
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.5df39786-e2bc-43c5-a989-170ec7dd54de.tmp.WERInternalMe
+               tadata.xml
+               WPR_initiated_DiagTrackMiniLogger_OneTrace_User_Logger_20260424_1_EC_0_inject.etl
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.2a0a7beb-5535-44f2-afb4-66b995f5c46f.tmp.etl
+               WPR_initiated_DiagTrackMiniLogger_WPR System Collector_inject.etl
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.961fd451-0c4a-476d-85ab-848da84f8dbd.tmp.etl
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.49f56db1-d064-4861-803b-e4a507faf401.tmp.csv
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.6cb5e22c-2eb3-4582-8fcd-f40bbe07e424.tmp.txt
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.1729e058-fcbf-46ba-844e-1c42c1b81fa4.tmp.xml
+               
+               Es posible que estos archivos estén disponibles aquí:
+               \\?\C:\ProgramData\Microsoft\Windows\WER\ReportArchive\Critical_sqlservr.exe_50b7181ef8729776403ee9df58a
+               677e4492615d_00000000_9eabb86c-3acf-4020-94a4-a74ac82569fd
+               
+               Símbolo de análisis: 
+               Nueva búsqueda de una solución: 0
+               Identificador de informe: 9eabb86c-3acf-4020-94a4-a74ac82569fd
+               Estado del informe: 268435456
+               Depósito con algoritmo hash: 
+               GUID de CAB: 0
+
+TimeCreated  : 9/06/2026 16:19:17
+ProviderName : Windows Error Reporting
+Id           : 1001
+Message      : Depósito con errores INVALID_REQUEST, tipo 0
+               Nombre de evento: SQLException64
+               Respuesta: No disponible
+               Identificador de archivo CAB: 0
+               
+               Firma del problema:
+               P1: sqlservr.exe
+               P2: 0.0.0.0
+               P3: 0000000000000000
+               P4: sqllang.dll
+               P5: 2022.160.4255.1
+               P6: 0000000069EB153C
+               P7: 17068
+               P8: 00000000003D8946
+               P9: 0000000000000000
+               P10: 7aa1e11b-edd7-4b5d-aa08-681635ed22ce
+               
+               Archivos adjuntos:
+               \\?\C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\SQLDmpr0013.P14352.00000000.T202
+               60609221912.{7aa1e11b-edd7-4b5d-aa08-681635ed22ce}.dmp
+               \\?\C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\SQLDump0013.log
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.6bc46893-f709-418f-80e8-f1d562885ddd.tmp.WERInternalMe
+               tadata.xml
+               WPR_initiated_DiagTrackMiniLogger_OneTrace_User_Logger_20260424_1_EC_0_inject.etl
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.899aca14-0b2d-4d4f-8e3f-084ace65639f.tmp.etl
+               WPR_initiated_DiagTrackMiniLogger_WPR System Collector_inject.etl
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.768dcf18-4376-46ad-8d87-71ebc5f442e7.tmp.etl
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.484aaf16-b4fd-4da5-8da4-8753a2dbce96.tmp.csv
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.23ec7854-90a8-45c3-bef9-17d00e98c08d.tmp.txt
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.1b47fdba-b0ee-43b4-b1a5-6d96bcd5846e.tmp.xml
+               
+               Es posible que estos archivos estén disponibles aquí:
+               \\?\C:\ProgramData\Microsoft\Windows\WER\ReportArchive\Critical_sqlservr.exe_e3c2c6ad4182e6ef07d42fd7108
+               74e36953385_00000000_3323bf5a-c3d5-4506-b3b0-4b220b039908
+               
+               Símbolo de análisis: 
+               Nueva búsqueda de una solución: 0
+               Identificador de informe: 3323bf5a-c3d5-4506-b3b0-4b220b039908
+               Estado del informe: 268435456
+               Depósito con algoritmo hash: 
+               GUID de CAB: 0
+
+TimeCreated  : 9/06/2026 16:19:16
+ProviderName : Windows Error Reporting
+Id           : 1001
+Message      : Depósito con errores , tipo 0
+               Nombre de evento: SQLException64
+               Respuesta: No disponible
+               Identificador de archivo CAB: 0
+               
+               Firma del problema:
+               P1: sqlservr.exe
+               P2: 0.0.0.0
+               P3: 0000000000000000
+               P4: sqllang.dll
+               P5: 2022.160.4255.1
+               P6: 0000000069EB153C
+               P7: 17068
+               P8: 00000000003D8946
+               P9: 0000000000000000
+               P10: 00670595-1ae3-4dca-a0cc-fafb89b6b0ba
+               
+               Archivos adjuntos:
+               \\?\C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\SQLDmpr0014.P3712.00000000.T2026
+               0609221914.{00670595-1ae3-4dca-a0cc-fafb89b6b0ba}.dmp
+               \\?\C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\SQLDump0014.log
+               
+               Es posible que estos archivos estén disponibles aquí:
+               NULL
+               
+               Símbolo de análisis: 
+               Nueva búsqueda de una solución: 0
+               Identificador de informe: 9eabb86c-3acf-4020-94a4-a74ac82569fd
+               Estado del informe: 1074003968
+               Depósito con algoritmo hash: 
+               GUID de CAB: 0
+
+TimeCreated  : 9/06/2026 16:19:14
+ProviderName : Windows Error Reporting
+Id           : 1001
+Message      : Depósito con errores INVALID_REQUEST, tipo 0
+               Nombre de evento: SQLException64
+               Respuesta: No disponible
+               Identificador de archivo CAB: 0
+               
+               Firma del problema:
+               P1: sqlservr.exe
+               P2: 0.0.0.0
+               P3: 0000000000000000
+               P4: sqllang.dll
+               P5: 2022.160.4255.1
+               P6: 0000000069EB153C
+               P7: 17068
+               P8: 00000000003D8946
+               P9: 0000000000000000
+               P10: 770f3dfd-1451-45b4-81ca-6e911c98b816
+               
+               Archivos adjuntos:
+               \\?\C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\SQLDmpr0012.P19904.00000000.T202
+               60609221909.{770f3dfd-1451-45b4-81ca-6e911c98b816}.dmp
+               \\?\C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\SQLDump0012.log
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.b2f9c377-8171-41a9-a3b1-0998a775dca0.tmp.WERInternalMe
+               tadata.xml
+               WPR_initiated_DiagTrackMiniLogger_OneTrace_User_Logger_20260424_1_EC_0_inject.etl
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.8f26b82d-f720-4144-bdb3-91c09e2610a8.tmp.etl
+               WPR_initiated_DiagTrackMiniLogger_WPR System Collector_inject.etl
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.962b3a53-edc7-4314-bc96-ea6c634f4ccf.tmp.etl
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.4346f1ce-3fbb-4417-98d6-f85c3e9f8eff.tmp.csv
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.2ce7882d-f087-41bd-bf9c-5e8a43c8da80.tmp.txt
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.58b6f126-6594-47c2-8c34-229f4a398344.tmp.xml
+               
+               Es posible que estos archivos estén disponibles aquí:
+               \\?\C:\ProgramData\Microsoft\Windows\WER\ReportArchive\Critical_sqlservr.exe_d590974fde4bb3b3149ff3d444e
+               1a84f66f8_00000000_0a9fdc84-59f7-4180-815c-1daaacf09b89
+               
+               Símbolo de análisis: 
+               Nueva búsqueda de una solución: 0
+               Identificador de informe: 0a9fdc84-59f7-4180-815c-1daaacf09b89
+               Estado del informe: 268435456
+               Depósito con algoritmo hash: 
+               GUID de CAB: 0
+
+TimeCreated  : 9/06/2026 16:19:13
+ProviderName : Windows Error Reporting
+Id           : 1001
+Message      : Depósito con errores , tipo 0
+               Nombre de evento: SQLException64
+               Respuesta: No disponible
+               Identificador de archivo CAB: 0
+               
+               Firma del problema:
+               P1: sqlservr.exe
+               P2: 0.0.0.0
+               P3: 0000000000000000
+               P4: sqllang.dll
+               P5: 2022.160.4255.1
+               P6: 0000000069EB153C
+               P7: 17068
+               P8: 00000000003D8946
+               P9: 0000000000000000
+               P10: 7aa1e11b-edd7-4b5d-aa08-681635ed22ce
+               
+               Archivos adjuntos:
+               \\?\C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\SQLDmpr0013.P14352.00000000.T202
+               60609221912.{7aa1e11b-edd7-4b5d-aa08-681635ed22ce}.dmp
+               \\?\C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\SQLDump0013.log
+               
+               Es posible que estos archivos estén disponibles aquí:
+               NULL
+               
+               Símbolo de análisis: 
+               Nueva búsqueda de una solución: 0
+               Identificador de informe: 3323bf5a-c3d5-4506-b3b0-4b220b039908
+               Estado del informe: 1074003968
+               Depósito con algoritmo hash: 
+               GUID de CAB: 0
+
+TimeCreated  : 9/06/2026 16:19:14
+ProviderName : MSSQLSERVER
+Id           : 9012
+Message      : There have been 256 misaligned log IOs which required falling back to synchronous IO.  The current IO 
+               is on file C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\master.mdf.
+
+TimeCreated  : 9/06/2026 16:19:14
+ProviderName : MSSQLSERVER
+Id           : 17658
+Message      : SQL Server started in single-user mode. This an informational message only. No user action is required.
+
+TimeCreated  : 9/06/2026 16:19:14
+ProviderName : MSSQLSERVER
+Id           : 17118
+Message      : Database Instant File Initialization: disabled. For security and performance considerations see the 
+               topic 'Database Instant File Initialization' in SQL Server Books Online. This is an informational 
+               message only. No user action is required.
+
+TimeCreated  : 9/06/2026 16:19:14
+ProviderName : MSSQLSERVER
+Id           : 17125
+Message      : Using dynamic lock allocation.  Initial allocation of 2500 Lock blocks and 5000 Lock Owner blocks per 
+               node.  This is an informational message only.  No user action is required.
+
+TimeCreated  : 9/06/2026 16:19:14
+ProviderName : MSSQLSERVER
+Id           : 17152
+Message      : Node configuration: node 0: CPU mask: 0x000000000000000f:0 Active CPU mask: 0x000000000000000f:0. This 
+               message provides a description of the NUMA configuration for this computer. This is an informational 
+               message only. No user action is required.
+
+TimeCreated  : 9/06/2026 16:19:14
+ProviderName : MSSQLSERVER
+Id           : 17176
+Message      : This instance of SQL Server last reported using a process ID of 14352 at 9/06/2026 16:19:11 (local) 
+               9/06/2026 22:19:11 (UTC). This is an informational message only; no user action is required.
+
+TimeCreated  : 9/06/2026 16:19:14
+ProviderName : MSSQLSERVER
+Id           : 17442
+Message      : SQL Server detected the following NUMA node configuration (NUMA Node number 0, Processor Group number 
+               0, CPU Mask 0x000000000000003f).
+
+TimeCreated  : 9/06/2026 16:19:14
+ProviderName : MSSQLSERVER
+Id           : 17162
+Message      : SQL Server is starting at normal priority base (=7). This is an informational message only. No user 
+               action is required.
+
+TimeCreated  : 9/06/2026 16:19:14
+ProviderName : MSSQLSERVER
+Id           : 17164
+Message      : SQL Server detected 1 sockets with 6 cores per socket and 6 logical processors per socket, 6 total 
+               logical processors; using 4 logical processors based on SQL Server licensing. This is an informational 
+               message; no user action is required.
+
+TimeCreated  : 9/06/2026 16:19:14
+ProviderName : MSSQLSERVER
+Id           : 17115
+Message      : Command Line Startup Parameters:
+               	 -s "MSSQLSERVER"
+               	 -m "SqlSetup"
+               	 -T 4022
+               	 -T 4010
+               	 -T 1905
+               	 -T 3701
+               	 -T 8015
+
+TimeCreated  : 9/06/2026 16:19:14
+ProviderName : MSSQLSERVER
+Id           : 17110
+Message      : Registry startup parameters: 
+               	 -d C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\master.mdf
+               	 -e C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG
+               	 -l C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\mastlog.ldf
+
+TimeCreated  : 9/06/2026 16:19:14
+ProviderName : MSSQLSERVER
+Id           : 49904
+Message      : The service account is 'NT Service\MSSQLSERVER'. This is an informational message; no user action is 
+               required.
+
+TimeCreated  : 9/06/2026 16:19:14
+ProviderName : MSSQLSERVER
+Id           : 17111
+Message      : Logging SQL Server messages in file 'C:\Program Files\Microsoft SQL 
+               Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG'.
+
+TimeCreated  : 9/06/2026 16:19:14
+ProviderName : MSSQLSERVER
+Id           : 17069
+Message      : Microsoft SQL Server 2022 (RTM-CU25) (KB5081477) - 16.0.4255.1 (X64) 
+               	Apr 23 2026 22:38:54 
+               	Copyright (C) 2022 Microsoft Corporation
+               	Express Edition (64-bit) on Windows 10 Home Single Language 10.0 <X64> (Build 26200: )
+               
+
+TimeCreated  : 9/06/2026 16:19:12
+ProviderName : Windows Error Reporting
+Id           : 1001
+Message      : Depósito con errores INVALID_REQUEST, tipo 0
+               Nombre de evento: SQLException64
+               Respuesta: No disponible
+               Identificador de archivo CAB: 0
+               
+               Firma del problema:
+               P1: sqlservr.exe
+               P2: 0.0.0.0
+               P3: 0000000000000000
+               P4: sqlmin.dll
+               P5: 2022.160.4255.1
+               P6: 0000000069EB154A
+               P7: -1073741571
+               P8: 00000000000C867B
+               P9: 000000010B4842DE
+               P10: 531b9688-2f2b-435f-b273-f2c761b2d1d0
+               
+               Archivos adjuntos:
+               \\?\C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\SQLDmpr0011.P19904.0B4842DE.T202
+               60609221907.{531b9688-2f2b-435f-b273-f2c761b2d1d0}.dmp
+               \\?\C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\SQLDump0011.log
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.8db1da1c-2937-4e0e-a34c-ba0f65cccf39.tmp.WERInternalMe
+               tadata.xml
+               WPR_initiated_DiagTrackMiniLogger_OneTrace_User_Logger_20260424_1_EC_0_inject.etl
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.b344b962-c1fc-4936-a948-87aa805a0a5b.tmp.etl
+               WPR_initiated_DiagTrackMiniLogger_WPR System Collector_inject.etl
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.26a9c112-1241-400c-b180-6a0293cf624d.tmp.etl
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.b132a1a9-6794-4115-b0cf-eff028650c73.tmp.csv
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.31680829-e00d-4852-98b9-4f7209d1ee45.tmp.txt
+               \\?\C:\ProgramData\Microsoft\Windows\WER\Temp\WER.142144dc-f8fb-4e27-b826-bfba9e6470e3.tmp.xml
+               
+               Es posible que estos archivos estén disponibles aquí:
+               \\?\C:\ProgramData\Microsoft\Windows\WER\ReportArchive\Critical_sqlservr.exe_9f20af2951e86bc6d51f911c743
+               9c057de5c6a85_00000000_246b4958-5bf2-4283-9a67-e37957bdc302
+               
+               Símbolo de análisis: 
+               Nueva búsqueda de una solución: 0
+               Identificador de informe: 246b4958-5bf2-4283-9a67-e37957bdc302
+               Estado del informe: 268435456
+               Depósito con algoritmo hash: 
+               GUID de CAB: 0
+
+TimeCreated  : 9/06/2026 16:19:11
+ProviderName : Windows Error Reporting
+Id           : 1001
+Message      : Depósito con errores , tipo 0
+               Nombre de evento: SQLException64
+               Respuesta: No disponible
+               Identificador de archivo CAB: 0
+               
+               Firma del problema:
+               P1: sqlservr.exe
+               P2: 0.0.0.0
+               P3: 0000000000000000
+               P4: sqllang.dll
+               P5: 2022.160.4255.1
+               P6: 0000000069EB153C
+               P7: 17068
+               P8: 00000000003D8946
+               P9: 0000000000000000
+               P10: 770f3dfd-1451-45b4-81ca-6e911c98b816
+               
+               Archivos adjuntos:
+               \\?\C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\SQLDmpr0012.P19904.00000000.T202
+               60609221909.{770f3dfd-1451-45b4-81ca-6e911c98b816}.dmp
+               \\?\C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\SQLDump0012.log
+               
+               Es posible que estos archivos estén disponibles aquí:
+               NULL
+               
+               Símbolo de análisis: 
+               Nueva búsqueda de una solución: 0
+               Identificador de informe: 0a9fdc84-59f7-4180-815c-1daaacf09b89
+               Estado del informe: 1074003968
+               Depósito con algoritmo hash: 
+               GUID de CAB: 0
+
+TimeCreated  : 9/06/2026 16:19:11
+ProviderName : MSSQLSERVER
+Id           : 9012
+Message      : There have been 256 misaligned log IOs which required falling back to synchronous IO.  The current IO 
+               is on file C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\master.mdf.
+
+TimeCreated  : 9/06/2026 16:19:11
+ProviderName : MSSQLSERVER
+Id           : 17658
+Message      : SQL Server started in single-user mode. This an informational message only. No user action is required.
+
+TimeCreated  : 9/06/2026 16:19:11
+ProviderName : MSSQLSERVER
+Id           : 17118
+Message      : Database Instant File Initialization: disabled. For security and performance considerations see the 
+               topic 'Database Instant File Initialization' in SQL Server Books Online. This is an informational 
+               message only. No user action is required.
+
+TimeCreated  : 9/06/2026 16:19:11
+ProviderName : MSSQLSERVER
+Id           : 17125
+Message      : Using dynamic lock allocation.  Initial allocation of 2500 Lock blocks and 5000 Lock Owner blocks per 
+               node.  This is an informational message only.  No user action is required.
+
+TimeCreated  : 9/06/2026 16:19:11
+ProviderName : MSSQLSERVER
+Id           : 17152
+Message      : Node configuration: node 0: CPU mask: 0x000000000000000f:0 Active CPU mask: 0x000000000000000f:0. This 
+               message provides a description of the NUMA configuration for this computer. This is an informational 
+               message only. No user action is required.
+
+TimeCreated  : 9/06/2026 16:19:11
+ProviderName : MSSQLSERVER
+Id           : 17176
+Message      : This instance of SQL Server last reported using a process ID of 19904 at 9/06/2026 16:19:06 (local) 
+               9/06/2026 22:19:06 (UTC). This is an informational message only; no user action is required.
+
+TimeCreated  : 9/06/2026 16:19:11
+ProviderName : MSSQLSERVER
+Id           : 17442
+Message      : SQL Server detected the following NUMA node configuration (NUMA Node number 0, Processor Group number 
+               0, CPU Mask 0x000000000000003f).
+
+TimeCreated  : 9/06/2026 16:19:11
+ProviderName : MSSQLSERVER
+Id           : 17162
+Message      : SQL Server is starting at normal priority base (=7). This is an informational message only. No user 
+               action is required.
+
+TimeCreated  : 9/06/2026 16:19:11
+ProviderName : MSSQLSERVER
+Id           : 17164
+Message      : SQL Server detected 1 sockets with 6 cores per socket and 6 logical processors per socket, 6 total 
+               logical processors; using 4 logical processors based on SQL Server licensing. This is an informational 
+               message; no user action is required.
+
+TimeCreated  : 9/06/2026 16:19:11
+ProviderName : MSSQLSERVER
+Id           : 17115
+Message      : Command Line Startup Parameters:
+               	 -s "MSSQLSERVER"
+               	 -m "SqlSetup"
+               	 -T 4022
+               	 -T 4010
+               	 -T 1905
+               	 -T 3701
+               	 -T 8015
+
+TimeCreated  : 9/06/2026 16:19:11
+ProviderName : MSSQLSERVER
+Id           : 17110
+Message      : Registry startup parameters: 
+               	 -d C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\master.mdf
+               	 -e C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG
+               	 -l C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\mastlog.ldf
+
+TimeCreated  : 9/06/2026 16:19:11
+ProviderName : MSSQLSERVER
+Id           : 49904
+Message      : The service account is 'NT Service\MSSQLSERVER'. This is an informational message; no user action is 
+               required.
+
+TimeCreated  : 9/06/2026 16:19:11
+ProviderName : MSSQLSERVER
+Id           : 17111
+Message      : Logging SQL Server messages in file 'C:\Program Files\Microsoft SQL 
+               Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG'.
+
+TimeCreated  : 9/06/2026 16:19:11
+ProviderName : MSSQLSERVER
+Id           : 17069
+Message      : Microsoft SQL Server 2022 (RTM-CU25) (KB5081477) - 16.0.4255.1 (X64) 
+               	Apr 23 2026 22:38:54 
+               	Copyright (C) 2022 Microsoft Corporation
+               	Express Edition (64-bit) on Windows 10 Home Single Language 10.0 <X64> (Build 26200: )
+               
+
+TimeCreated  : 9/06/2026 16:19:09
+ProviderName : Windows Error Reporting
+Id           : 1001
+Message      : Depósito con errores , tipo 0
+               Nombre de evento: SQLException64
+               Respuesta: No disponible
+               Identificador de archivo CAB: 0
+               
+               Firma del problema:
+               P1: sqlservr.exe
+               P2: 0.0.0.0
+               P3: 0000000000000000
+               P4: sqlmin.dll
+               P5: 2022.160.4255.1
+               P6: 0000000069EB154A
+               P7: -1073741571
+               P8: 00000000000C867B
+               P9: 000000010B4842DE
+               P10: 531b9688-2f2b-435f-b273-f2c761b2d1d0
+               
+               Archivos adjuntos:
+               \\?\C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\SQLDmpr0011.P19904.0B4842DE.T202
+               60609221907.{531b9688-2f2b-435f-b273-f2c761b2d1d0}.dmp
+               \\?\C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\SQLDump0011.log
+               
+               Es posible que estos archivos estén disponibles aquí:
+               NULL
+               
+               Símbolo de análisis: 
+               Nueva búsqueda de una solución: 0
+               Identificador de informe: 246b4958-5bf2-4283-9a67-e37957bdc302
+               Estado del informe: 1074003968
+               Depósito con algoritmo hash: 
+               GUID de CAB: 0
+
+TimeCreated  : 9/06/2026 16:19:07
+ProviderName : MSSQLSERVER
+Id           : 9012
+Message      : There have been 256 misaligned log IOs which required falling back to synchronous IO.  The current IO 
+               is on file C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\master.mdf.
+
+TimeCreated  : 9/06/2026 16:19:06
+ProviderName : MSSQLSERVER
+Id           : 17658
+Message      : SQL Server started in single-user mode. This an informational message only. No user action is required.
+
+TimeCreated  : 9/06/2026 16:19:06
+ProviderName : MSSQLSERVER
+Id           : 17118
+Message      : Database Instant File Initialization: disabled. For security and performance considerations see the 
+               topic 'Database Instant File Initialization' in SQL Server Books Online. This is an informational 
+               message only. No user action is required.
+
+TimeCreated  : 9/06/2026 16:19:06
+ProviderName : MSSQLSERVER
+Id           : 17125
+Message      : Using dynamic lock allocation.  Initial allocation of 2500 Lock blocks and 5000 Lock Owner blocks per 
+               node.  This is an informational message only.  No user action is required.
+
+TimeCreated  : 9/06/2026 16:19:06
+ProviderName : MSSQLSERVER
+Id           : 17152
+Message      : Node configuration: node 0: CPU mask: 0x000000000000000f:0 Active CPU mask: 0x000000000000000f:0. This 
+               message provides a description of the NUMA configuration for this computer. This is an informational 
+               message only. No user action is required.
+
+TimeCreated  : 9/06/2026 16:19:06
+ProviderName : MSSQLSERVER
+Id           : 17176
+Message      : This instance of SQL Server last reported using a process ID of 20784 at 9/06/2026 16:17:18 (local) 
+               9/06/2026 22:17:18 (UTC). This is an informational message only; no user action is required.
+
+TimeCreated  : 9/06/2026 16:19:06
+ProviderName : MSSQLSERVER
+Id           : 17442
+Message      : SQL Server detected the following NUMA node configuration (NUMA Node number 0, Processor Group number 
+               0, CPU Mask 0x000000000000003f).
+
+TimeCreated  : 9/06/2026 16:19:06
+ProviderName : MSSQLSERVER
+Id           : 17162
+Message      : SQL Server is starting at normal priority base (=7). This is an informational message only. No user 
+               action is required.
+
+TimeCreated  : 9/06/2026 16:19:06
+ProviderName : MSSQLSERVER
+Id           : 17164
+Message      : SQL Server detected 1 sockets with 6 cores per socket and 6 logical processors per socket, 6 total 
+               logical processors; using 4 logical processors based on SQL Server licensing. This is an informational 
+               message; no user action is required.
+
+TimeCreated  : 9/06/2026 16:19:06
+ProviderName : MSSQLSERVER
+Id           : 17115
+Message      : Command Line Startup Parameters:
+               	 -s "MSSQLSERVER"
+               	 -m "SqlSetup"
+               	 -T 4022
+               	 -T 4010
+               	 -T 1905
+               	 -T 3701
+               	 -T 8015
+
+TimeCreated  : 9/06/2026 16:19:06
+ProviderName : MSSQLSERVER
+Id           : 17110
+Message      : Registry startup parameters: 
+               	 -d C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\master.mdf
+               	 -e C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG
+               	 -l C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\mastlog.ldf
+
+TimeCreated  : 9/06/2026 16:19:06
+ProviderName : MSSQLSERVER
+Id           : 49904
+Message      : The service account is 'NT Service\MSSQLSERVER'. This is an informational message; no user action is 
+               required.
+
+
+
+

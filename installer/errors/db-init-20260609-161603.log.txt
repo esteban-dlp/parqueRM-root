@@ -1,0 +1,158 @@
+[16:16:03] === Preflight: SQL Server disk sector compatibility ===
+[16:16:03] Checking disk sector compatibility for SQL Server on C:\ ...
+  Error 3: El sistema no puede encontrar la ruta especificada.
+[16:16:03] Could not parse physical sector size from fsutil output. Continuing without registry change.
+[16:16:03] === Step 1: SQL Server Express ===
+[16:16:03] SQL Server already installed: MSSQLSERVER
+[16:16:03] Applying SQL Server update package: C:\ParqueRM\runtime\sqlserver-express\updates\SQLServer2022-KB5081477-x64.exe
+[16:19:30] ERROR: SQL Server update package failed (exit code -2061893606).
+[16:19:30] SQL Server ERRORLOG tail: C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG
+  2026-06-09 16:19:14.15 Server      Microsoft SQL Server 2022 (RTM-CU25) (KB5081477) - 16.0.4255.1 (X64) 
+  	Apr 23 2026 22:38:54 
+  	Copyright (C) 2022 Microsoft Corporation
+  	Express Edition (64-bit) on Windows 10 Home Single Language 10.0 <X64> (Build 26200: )
+  
+  2026-06-09 16:19:14.18 Server      UTC adjustment: -6:00
+  2026-06-09 16:19:14.18 Server      (c) Microsoft Corporation.
+  2026-06-09 16:19:14.18 Server      All rights reserved.
+  2026-06-09 16:19:14.18 Server      Server process ID is 3712.
+  2026-06-09 16:19:14.18 Server      System Manufacturer: 'HP', System Model: 'HP Pavilion Laptop 15-eh0xxx'.
+  2026-06-09 16:19:14.18 Server      Authentication mode is MIXED.
+  2026-06-09 16:19:14.18 Server      Logging SQL Server messages in file 'C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG'.
+  2026-06-09 16:19:14.18 Server      The service account is 'NT Service\MSSQLSERVER'. This is an informational message; no user action is required.
+  2026-06-09 16:19:14.18 Server      Registry startup parameters: 
+  	 -d C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\master.mdf
+  	 -e C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG
+  	 -l C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\mastlog.ldf
+  2026-06-09 16:19:14.18 Server      Command Line Startup Parameters:
+  	 -s "MSSQLSERVER"
+  	 -m "SqlSetup"
+  	 -T 4022
+  	 -T 4010
+  	 -T 1905
+  	 -T 3701
+  	 -T 8015
+  2026-06-09 16:19:14.18 Server      SQL Server detected 1 sockets with 6 cores per socket and 6 logical processors per socket, 6 total logical processors; using 4 logical processors based on SQL Server licensing. This is an informational message; no user action is required.
+  2026-06-09 16:19:14.18 Server      SQL Server is starting at normal priority base (=7). This is an informational message only. No user action is required.
+  2026-06-09 16:19:14.18 Server      Detected 7541 MB of RAM, 1627 MB of available memory, 2584 MB of available page file. This is an informational message; no user action is required.
+  2026-06-09 16:19:14.18 Server      Using conventional memory in the memory manager.
+  2026-06-09 16:19:14.18 Server      Detected pause instruction latency: 71 cycles.
+  2026-06-09 16:19:14.18 Server      SQL Server detected the following NUMA node configuration (NUMA Node number 0, Processor Group number 0, CPU Mask 0x000000000000003f).
+  2026-06-09 16:19:14.19 Server      Page exclusion bitmap is enabled.
+  2026-06-09 16:19:14.22 Server      Buffer Pool: Allocating 4194304 bytes for 404531 hashPages.
+  2026-06-09 16:19:14.22 Server      Default collation: SQL_Latin1_General_CP1_CI_AS (us_english 1033)
+  2026-06-09 16:19:14.27 Server      Buffer pool extension is already disabled. No action is necessary.
+  2026-06-09 16:19:14.33 Server      CPU vectorization level(s) detected:  SSE SSE2 SSE3 SSSE3 SSE41 SSE42 AVX AVX2 POPCNT BMI1 BMI2
+  2026-06-09 16:19:14.34 Server      Perfmon counters for resource governor pools and groups failed to initialize and are disabled.
+  2026-06-09 16:19:14.37 Server      Query Store settings initialized with enabled = 1, 
+  2026-06-09 16:19:14.37 Server      The maximum number of dedicated administrator connections for this instance is '1'
+  2026-06-09 16:19:14.37 Server      This instance of SQL Server last reported using a process ID of 14352 at 9/06/2026 16:19:11 (local) 9/06/2026 22:19:11 (UTC). This is an informational message only; no user action is required.
+  2026-06-09 16:19:14.37 Server      Node configuration: node 0: CPU mask: 0x000000000000000f:0 Active CPU mask: 0x000000000000000f:0. This message provides a description of the NUMA configuration for this computer. This is an informational message only. No user action is required.
+  2026-06-09 16:19:14.38 Server      Using dynamic lock allocation.  Initial allocation of 2500 Lock blocks and 5000 Lock Owner blocks per node.  This is an informational message only.  No user action is required.
+  2026-06-09 16:19:14.39 Server      In-Memory OLTP initialized on lowend machine.
+  2026-06-09 16:19:14.41 Server      [INFO] Created Extended Events session 'hkenginexesession'
+  2026-06-09 16:19:14.41 Server      Database Instant File Initialization: disabled. For security and performance considerations see the topic 'Database Instant File Initialization' in SQL Server Books Online. This is an informational message only. No user action is required.
+  2026-06-09 16:19:14.41 Server      Total Log Writer threads: 2. This is an informational message; no user action is required.
+  2026-06-09 16:19:14.41 Server      Database Mirroring Transport is disabled in the endpoint configuration.
+  2026-06-09 16:19:14.41 Server      clwb is selected for pmem flush operation.
+  2026-06-09 16:19:14.41 spid20s     Warning ******************
+  2026-06-09 16:19:14.41 spid20s     SQL Server started in single-user mode. This an informational message only. No user action is required.
+  2026-06-09 16:19:14.42 Server      Software Usage Metrics is disabled.
+  2026-06-09 16:19:14.42 spid20s     Starting up database 'master'.
+  2026-06-09 16:19:14.44 spid20s     There have been 256 misaligned log IOs which required falling back to synchronous IO.  The current IO is on file C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\master.mdf.
+  2026-06-09 16:19:14.45 spid20s     Unable to create stack dump file due to stack shortage (ex_terminator - Last chance exception handling)
+  2026-06-09 16:19:14.45 spid20s     Stack Signature for the dump is 0x0000000000000000
+  2026-06-09 16:19:14.45 spid20s     SaveNumaNodeRelationShip : 0 of 1 numa nodes info saved to pDump.
+  2026-06-09 16:19:14.45 spid20s     CDmpClient::ExecuteAllCallbacks started.
+  2026-06-09 16:19:14.45 spid20s     XE_DumpCallbacks is executing...
+  2026-06-09 16:19:14.48 spid20s     DumpCallbackSOS is executing...
+  2026-06-09 16:19:14.48 spid20s     DumpCallbackEE is executing...
+  2026-06-09 16:19:14.48 spid20s     DumpCallbackSE is executing...
+  2026-06-09 16:19:14.48 spid20s     DumpCallbackSEAM is executing...
+  2026-06-09 16:19:14.48 spid20s     DumpCallbackSSB is executing...
+  2026-06-09 16:19:14.52 spid20s     DumpCallbackQE is executing...
+  2026-06-09 16:19:14.52 spid20s     DumpCallbackFullText is executing...
+  2026-06-09 16:19:14.52 spid20s     DumpCallbackSQLCLR is executing...
+  2026-06-09 16:19:14.52 spid20s     DumpCallbackHk is executing...
+  2026-06-09 16:19:14.53 spid20s     DumpCallbackRepl is executing...
+  2026-06-09 16:19:14.53 spid20s     DumpCallbackPolyBase is executing...
+  2026-06-09 16:19:14.53 spid20s     CDmpClient::ExecuteAllCallbacks completed. Time elapsed: 0 seconds.
+  2026-06-09 16:19:14.90 Server      External governance manager initialized
+  2026-06-09 16:19:16.20 spid20s     External dump process return code 0x20000001.
+  External dump process returned no errors.
+  
+[16:19:30] SQL Server ERRORLOG tail: C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG.1
+  2026-06-09 16:19:11.61 Server      Microsoft SQL Server 2022 (RTM-CU25) (KB5081477) - 16.0.4255.1 (X64) 
+  	Apr 23 2026 22:38:54 
+  	Copyright (C) 2022 Microsoft Corporation
+  	Express Edition (64-bit) on Windows 10 Home Single Language 10.0 <X64> (Build 26200: )
+  
+  2026-06-09 16:19:11.64 Server      UTC adjustment: -6:00
+  2026-06-09 16:19:11.64 Server      (c) Microsoft Corporation.
+  2026-06-09 16:19:11.64 Server      All rights reserved.
+  2026-06-09 16:19:11.64 Server      Server process ID is 14352.
+  2026-06-09 16:19:11.64 Server      System Manufacturer: 'HP', System Model: 'HP Pavilion Laptop 15-eh0xxx'.
+  2026-06-09 16:19:11.64 Server      Authentication mode is MIXED.
+  2026-06-09 16:19:11.64 Server      Logging SQL Server messages in file 'C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG'.
+  2026-06-09 16:19:11.64 Server      The service account is 'NT Service\MSSQLSERVER'. This is an informational message; no user action is required.
+  2026-06-09 16:19:11.64 Server      Registry startup parameters: 
+  	 -d C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\master.mdf
+  	 -e C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log\ERRORLOG
+  	 -l C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\mastlog.ldf
+  2026-06-09 16:19:11.64 Server      Command Line Startup Parameters:
+  	 -s "MSSQLSERVER"
+  	 -m "SqlSetup"
+  	 -T 4022
+  	 -T 4010
+  	 -T 1905
+  	 -T 3701
+  	 -T 8015
+  2026-06-09 16:19:11.64 Server      SQL Server detected 1 sockets with 6 cores per socket and 6 logical processors per socket, 6 total logical processors; using 4 logical processors based on SQL Server licensing. This is an informational message; no user action is required.
+  2026-06-09 16:19:11.64 Server      SQL Server is starting at normal priority base (=7). This is an informational message only. No user action is required.
+  2026-06-09 16:19:11.65 Server      Detected 7541 MB of RAM, 1613 MB of available memory, 2570 MB of available page file. This is an informational message; no user action is required.
+  2026-06-09 16:19:11.65 Server      Using conventional memory in the memory manager.
+  2026-06-09 16:19:11.65 Server      Detected pause instruction latency: 71 cycles.
+  2026-06-09 16:19:11.65 Server      SQL Server detected the following NUMA node configuration (NUMA Node number 0, Processor Group number 0, CPU Mask 0x000000000000003f).
+  2026-06-09 16:19:11.65 Server      Page exclusion bitmap is enabled.
+  2026-06-09 16:19:11.70 Server      Buffer Pool: Allocating 4194304 bytes for 402226 hashPages.
+  2026-06-09 16:19:11.71 Server      Default collation: SQL_Latin1_General_CP1_CI_AS (us_english 1033)
+  2026-06-09 16:19:11.74 Server      Buffer pool extension is already disabled. No action is necessary.
+  2026-06-09 16:19:11.80 Server      CPU vectorization level(s) detected:  SSE SSE2 SSE3 SSSE3 SSE41 SSE42 AVX AVX2 POPCNT BMI1 BMI2
+  2026-06-09 16:19:11.81 Server      Perfmon counters for resource governor pools and groups failed to initialize and are disabled.
+  2026-06-09 16:19:11.84 Server      Query Store settings initialized with enabled = 1, 
+  2026-06-09 16:19:11.84 Server      The maximum number of dedicated administrator connections for this instance is '1'
+  2026-06-09 16:19:11.84 Server      This instance of SQL Server last reported using a process ID of 19904 at 9/06/2026 16:19:06 (local) 9/06/2026 22:19:06 (UTC). This is an informational message only; no user action is required.
+  2026-06-09 16:19:11.84 Server      Node configuration: node 0: CPU mask: 0x000000000000000f:0 Active CPU mask: 0x000000000000000f:0. This message provides a description of the NUMA configuration for this computer. This is an informational message only. No user action is required.
+  2026-06-09 16:19:11.85 Server      Using dynamic lock allocation.  Initial allocation of 2500 Lock blocks and 5000 Lock Owner blocks per node.  This is an informational message only.  No user action is required.
+  2026-06-09 16:19:11.86 Server      In-Memory OLTP initialized on lowend machine.
+  2026-06-09 16:19:11.89 Server      [INFO] Created Extended Events session 'hkenginexesession'
+  2026-06-09 16:19:11.89 Server      Database Instant File Initialization: disabled. For security and performance considerations see the topic 'Database Instant File Initialization' in SQL Server Books Online. This is an informational message only. No user action is required.
+  2026-06-09 16:19:11.89 Server      Total Log Writer threads: 2. This is an informational message; no user action is required.
+  2026-06-09 16:19:11.91 Server      Database Mirroring Transport is disabled in the endpoint configuration.
+  2026-06-09 16:19:11.91 spid19s     Warning ******************
+  2026-06-09 16:19:11.91 Server      clwb is selected for pmem flush operation.
+  2026-06-09 16:19:11.91 spid19s     SQL Server started in single-user mode. This an informational message only. No user action is required.
+  2026-06-09 16:19:11.91 Server      Software Usage Metrics is disabled.
+  2026-06-09 16:19:11.92 spid19s     Starting up database 'master'.
+  2026-06-09 16:19:11.94 spid19s     There have been 256 misaligned log IOs which required falling back to synchronous IO.  The current IO is on file C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA\master.mdf.
+  2026-06-09 16:19:11.94 spid19s     Unable to create stack dump file due to stack shortage (ex_terminator - Last chance exception handling)
+  2026-06-09 16:19:11.94 spid19s     Stack Signature for the dump is 0x0000000000000000
+  2026-06-09 16:19:11.94 spid19s     SaveNumaNodeRelationShip : 0 of 1 numa nodes info saved to pDump.
+  2026-06-09 16:19:11.94 spid19s     CDmpClient::ExecuteAllCallbacks started.
+  2026-06-09 16:19:11.94 spid19s     XE_DumpCallbacks is executing...
+  2026-06-09 16:19:11.97 spid19s     DumpCallbackSOS is executing...
+  2026-06-09 16:19:11.97 spid19s     DumpCallbackEE is executing...
+  2026-06-09 16:19:11.97 spid19s     DumpCallbackSE is executing...
+  2026-06-09 16:19:11.97 spid19s     DumpCallbackSEAM is executing...
+  2026-06-09 16:19:11.98 spid19s     DumpCallbackSSB is executing...
+  2026-06-09 16:19:12.02 spid19s     DumpCallbackQE is executing...
+  2026-06-09 16:19:12.02 spid19s     DumpCallbackFullText is executing...
+  2026-06-09 16:19:12.02 spid19s     DumpCallbackSQLCLR is executing...
+  2026-06-09 16:19:12.02 spid19s     DumpCallbackHk is executing...
+  2026-06-09 16:19:12.02 spid19s     DumpCallbackRepl is executing...
+  2026-06-09 16:19:12.02 spid19s     DumpCallbackPolyBase is executing...
+  2026-06-09 16:19:12.02 spid19s     CDmpClient::ExecuteAllCallbacks completed. Time elapsed: 0 seconds.
+  2026-06-09 16:19:12.40 Server      External governance manager initialized
+  2026-06-09 16:19:13.81 spid19s     External dump process return code 0x20000001.
+  External dump process returned no errors.
+  

@@ -1,0 +1,70 @@
+Overall summary:
+  Final result:                  El instalador de la revisión no ha podido actualizar la siguiente instancia:  MSSQLSERVER. Para determinar el motivo del error, consulte los archivos de registro.
+  Exit code (Decimal):           -2061893606
+  Start time:                    2026-06-09 16:16:14
+  End time:                      2026-06-09 16:19:26
+  Requested action:              Patch
+
+Instance MSSQLSERVER overall summary:
+  Final result:                  El instalador de la revisión no ha podido actualizar las características compartidas. Para determinar el motivo del error, consulte los archivos de registro.
+  Exit code (Decimal):           -2061893606
+  Start time:                    2026-06-09 16:16:42
+  End time:                      2026-06-09 16:19:21
+  Requested action:              Patch
+
+Machine Properties:
+  Machine name:                  USUARIO
+  Machine processor count:       6
+  OS version:                    Microsoft Windows 11 Home Single Language (10.0.26200)
+  OS service pack:               
+  OS region:                     Guatemala
+  OS language:                   español (México)
+  OS architecture:               x64
+  Process architecture:          64 bits
+  OS clustered:                  No
+
+Product features discovered:
+  Product              Instance             Instance ID                    Feature                                  Language             Edition              Version         Clustered  Configured
+  SQL Server 2022      MSSQLSERVER          MSSQL16.MSSQLSERVER            Servicios de Motor de base de datos      1033                 Express Edition      16.0.1000.6     No         Sí        
+
+Package properties:
+  Description:                   Microsoft SQL Server 2022 
+  ProductName:                   SQL Server 2022
+  Type:                          RTM
+  Version:                       16
+  SPLevel:                       0
+  KBArticle:                     KB5081477
+  KBArticleHyperlink:            https://support.microsoft.com/?kbid=5081477
+  PatchType:                     QFE
+  AssociatedHotfixBuild:         0
+  Platform:                      x64
+  PatchLevel:                    16.0.4255.1
+  ProductVersion:                16.0.1000.6
+  GDRReservedRange:              16.0.1100.0:16.0.3999.0
+  Installation location:         C:\1347fd3f28ae37f7ef0ec130\x64\setup\
+
+Updated product edition:
+  Instance             Edition             
+  MSSQLSERVER          Express             
+
+Configuración de entrada de usuario:
+  ACTION:                        Patch
+  ALLINSTANCES:                  true
+  CLUSTERPASSIVE:                false
+  CONFIGURATIONFILE:             
+  ENU:                           false
+  HELP:                          false
+  IACCEPTSQLSERVERLICENSETERMS:  true
+  IACKNOWLEDGEENTCALLIMITS:      false
+  INDICATEPROGRESS:              false
+  INSTANCEID:                    <vacío>
+  INSTANCENAME:                  <vacío>
+  QUIET:                         true
+  QUIETSIMPLE:                   false
+  SUPPRESSPAIDEDITIONNOTICE:     false
+  SUPPRESSPRIVACYSTATEMENTNOTICE: false
+  UIMODE:                        Normal
+
+Rules with failures or warnings:
+
+Rules report file:               C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Log\20260609_161614\SystemConfigurationCheck_Report.htm
