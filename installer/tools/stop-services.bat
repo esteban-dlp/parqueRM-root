@@ -7,6 +7,7 @@ if %ERRORLEVEL% neq 0 (
 )
 
 echo Stopping ParqueRM services...
+net stop ParqueRMLocalName
 net stop ParqueRMFrontend
 net stop ParqueRMBackend
 echo Done.

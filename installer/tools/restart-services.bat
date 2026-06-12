@@ -7,10 +7,12 @@ if %ERRORLEVEL% neq 0 (
 )
 
 echo Restarting ParqueRM services...
+net stop ParqueRMLocalName
 net stop ParqueRMFrontend
 net stop ParqueRMBackend
 timeout /t 3 /nobreak >nul
 net start ParqueRMBackend
 net start ParqueRMFrontend
+net start ParqueRMLocalName
 echo Done.
 pause

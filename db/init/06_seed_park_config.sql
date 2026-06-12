@@ -38,8 +38,8 @@ BEGIN
         '+502 0000-0000',
         'info@parque.local',
         NULL,
-        -- Fallback. Installer and Docker overwrite this with the detected server URL.
-        'http://192.168.1.10',
+        -- Fallback. Installer overwrites this with the stable local URL.
+        'http://parque.rm.local',
         150,
         '#1A3A2A',
         'v1.0',

@@ -2,11 +2,12 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Ejecuta al arrancar Windows: verifica la IP actual, actualiza la config si cambio,
-    y se asegura de que los servicios de ParqueRM esten corriendo.
+    Runs at Windows startup to keep ParqueRM local URL support healthy.
 
-.PARAMETER InstallDir
-    Directorio raiz de instalacion. Default: C:\ParqueRM
+.DESCRIPTION
+    Refreshes local hosts entries, logs current IPv4 addresses, and makes sure
+    ParqueRM services are running. It intentionally does not read or rewrite
+    database/JWT secrets.
 #>
 param(
     [string]$InstallDir = 'C:\ParqueRM'
@@ -25,104 +26,64 @@ function Write-Log([string]$msg, [string]$level = 'INFO') {
     Write-Host $line
 }
 
-Write-Log "=== ParqueRM startup check ==="
-
-# --- Leer IP guardada en config -----------------------------------------------
-$configPath = Join-Path $InstallDir 'config\parquerm.config.json'
-if (-not (Test-Path $configPath)) {
-    Write-Log "Config no encontrada en $configPath. Saltando actualizacion de IP." 'WARN'
-} else {
-    try {
-        $cfg      = Get-Content $configPath -Raw | ConvertFrom-Json
-        $savedIp  = $cfg.serverIp
-    } catch {
-        Write-Log "Error leyendo config: $_" 'ERROR'
-        $savedIp = ''
-    }
-
-    # --- Detectar IP LAN actual -----------------------------------------------
-    $currentIp = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+function Get-CurrentIpv4Addresses {
+    @(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
         Where-Object {
-            $_.InterfaceAlias -notmatch 'Loopback' -and
-            $_.InterfaceAlias -notmatch 'VirtualBox' -and
-            $_.InterfaceAlias -notmatch 'VMware' -and
-            $_.IPAddress -notlike '169.*' -and
-            $_.IPAddress -ne '127.0.0.1'
+            $_.IPAddress -notmatch '^127\.' -and
+            $_.IPAddress -notmatch '^169\.254\.' -and
+            $_.InterfaceAlias -notmatch 'Loopback|VirtualBox|VMware|vEthernet|WSL|Bluetooth|Tunnel'
         } |
-        Sort-Object InterfaceMetric |
-        Select-Object -First 1 -ExpandProperty IPAddress
-
-    if (-not $currentIp) {
-        Write-Log "No se pudo detectar IP LAN. Red no disponible aun." 'WARN'
-    } elseif ($savedIp -eq $currentIp) {
-        Write-Log "IP sin cambios ($currentIp)."
-    } else {
-        Write-Log "IP cambio de '$savedIp' a '$currentIp'. Actualizando configuracion..." 'WARN'
-
-        $envPath   = Join-Path $InstallDir 'app\backend\.env'
-        $genScript = Join-Path $InstallDir 'tools\installer-scripts\generate-config.ps1'
-
-        if (-not (Test-Path $genScript)) {
-            Write-Log "generate-config.ps1 no encontrado en $genScript. No se puede actualizar IP." 'ERROR'
-        } else {
-            # Leer DbPassword del .env existente
-            function Read-EnvVal([string]$path, [string]$key) {
-                if (-not (Test-Path $path)) { return '' }
-                $line = (Get-Content $path | Where-Object { $_ -match "^$([regex]::Escape($key))=" } | Select-Object -First 1)
-                if (-not $line) { return '' }
-                $val = ($line -split '=', 2)[1]
-                if ($val.Length -ge 2 -and $val[0] -eq '"' -and $val[-1] -eq '"') {
-                    $val = $val.Substring(1, $val.Length - 2)
-                }
-                return $val
-            }
-
-            $dbPassword = Read-EnvVal $envPath 'DB_PASSWORD'
-            if (-not $dbPassword) {
-                Write-Log "No se pudo leer DB_PASSWORD del .env. No se puede actualizar IP." 'ERROR'
-            } else {
-                try {
-                    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $genScript `
-                        -InstallDir $InstallDir `
-                        -ServerIp $currentIp `
-                        -DbPassword $dbPassword `
-                        -PreserveExistingSecrets
-                    if ($LASTEXITCODE -ne 0) {
-                        throw "generate-config.ps1 failed with exit code $LASTEXITCODE"
-                    }
-                    Write-Log "Configuracion actualizada para IP $currentIp."
-                } catch {
-                    Write-Log "Error actualizando config: $_" 'ERROR'
-                }
-            }
-        }
-    }
+        Select-Object -ExpandProperty IPAddress -Unique)
 }
 
-# --- Asegurar que los servicios esten corriendo --------------------------------
-foreach ($svcName in @('ParqueRMBackend', 'ParqueRMFrontend')) {
+Write-Log '=== ParqueRM startup check ==='
+
+$configureLocalName = Join-Path $InstallDir 'tools\installer-scripts\configure-local-name.ps1'
+if (Test-Path $configureLocalName) {
+    try {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $configureLocalName -InstallDir $InstallDir
+        if ($LASTEXITCODE -eq 0) {
+            Write-Log 'Local URL hosts entries refreshed.'
+        } else {
+            Write-Log "configure-local-name.ps1 exited with code $LASTEXITCODE." 'ERROR'
+        }
+    } catch {
+        Write-Log "Error refreshing local URL hosts entries: $_" 'ERROR'
+    }
+} else {
+    Write-Log "configure-local-name.ps1 not found at $configureLocalName." 'WARN'
+}
+
+$currentIps = @(Get-CurrentIpv4Addresses)
+if ($currentIps.Count -gt 0) {
+    Write-Log "Current IPv4 addresses: $($currentIps -join ', ')"
+} else {
+    Write-Log 'No LAN IPv4 address detected yet.' 'WARN'
+}
+
+foreach ($svcName in @('ParqueRMBackend', 'ParqueRMFrontend', 'ParqueRMLocalName')) {
     $svc = Get-Service -Name $svcName -ErrorAction SilentlyContinue
     if (-not $svc) {
-        Write-Log "Servicio $svcName no encontrado (no instalado)." 'WARN'
+        Write-Log "Service $svcName not found." 'WARN'
         continue
     }
     if ($svc.Status -ne 'Running') {
-        Write-Log "Servicio $svcName detenido. Intentando iniciar..." 'WARN'
+        Write-Log "Service $svcName is stopped. Attempting start..." 'WARN'
         try {
             Start-Service -Name $svcName -ErrorAction Stop
             Start-Sleep -Seconds 5
             $svc.Refresh()
             if ($svc.Status -eq 'Running') {
-                Write-Log "Servicio $svcName iniciado correctamente."
+                Write-Log "Service $svcName started successfully."
             } else {
-                Write-Log "Servicio $svcName no respondio al inicio. Estado: $($svc.Status)" 'ERROR'
+                Write-Log "Service $svcName did not report Running. Status: $($svc.Status)" 'ERROR'
             }
         } catch {
-            Write-Log "Error iniciando ${svcName}: $_" 'ERROR'
+            Write-Log "Error starting ${svcName}: $_" 'ERROR'
         }
     } else {
-        Write-Log "Servicio $svcName corriendo OK."
+        Write-Log "Service $svcName running OK."
     }
 }
 
-Write-Log "=== Fin del startup check ==="
+Write-Log '=== End startup check ==='

@@ -66,6 +66,7 @@ echo.
 echo Restarting services...
 net start ParqueRMBackend  >nul 2>&1
 net start ParqueRMFrontend >nul 2>&1
+net start ParqueRMLocalName >nul 2>&1
 echo [OK] Services restarted.
 echo.
 pause

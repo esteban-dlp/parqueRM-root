@@ -359,7 +359,7 @@ function Test-LocalSqlTcp {
 function Get-SystemDriveRoot {
     $drive = $env:SystemDrive
     if ([string]::IsNullOrWhiteSpace($drive)) { $drive = 'C:' }
-    return $drive.TrimEnd('\') + '\'
+    return $drive.TrimEnd('\')
 }
 
 function Invoke-FsutilSectorInfo([string]$VolumeRoot) {
@@ -439,6 +439,35 @@ function Enable-SqlSectorCompatibilityIfNeeded {
     exit $ExitCodeSqlRebootRequired
 }
 
+function Invoke-SqlSectorRecoveryIfNeeded([string]$Context) {
+    $volume = Get-SystemDriveRoot
+    $sectorInfo = @(Invoke-FsutilSectorInfo $volume)
+    $maxSectorBytes = Get-MaxPhysicalSectorBytes $sectorInfo
+    if ($maxSectorBytes -le 4096) { return $false }
+
+    Write-Log "Detected $maxSectorBytes byte physical sectors while handling: $Context" 'Yellow'
+    if (Test-SqlSectorCompatibilityRegistryFixApplied) {
+        Write-Log "SQL Server NVMe sector compatibility registry fix is already present. Reboot Windows and retry the installer." 'Yellow'
+        exit $ExitCodeSqlRebootRequired
+    }
+
+    Write-Log "Applying SQL Server NVMe sector compatibility registry fix after SQL failure..." 'Yellow'
+    $regPath = 'HKLM:\SYSTEM\CurrentControlSet\Services\stornvme\Parameters\Device'
+    if (-not (Test-Path $regPath)) {
+        New-Item -Path $regPath -Force | Out-Null
+    }
+    New-ItemProperty `
+        -Path $regPath `
+        -Name 'ForcedPhysicalSectorSizeInBytes' `
+        -PropertyType MultiString `
+        -Force `
+        -Value '* 4095' |
+        Out-Null
+
+    Write-Log "SQL Server NVMe sector compatibility registry fix applied. Windows restart is required." 'Yellow'
+    exit $ExitCodeSqlRebootRequired
+}
+
 function Write-RecentSqlErrorLogTail {
     $logRoots = @(
         'C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log',
@@ -496,6 +525,7 @@ function Invoke-SqlServerUpdateIfAvailable {
 
     Write-Log "ERROR: SQL Server update package failed (exit code $($proc.ExitCode))." 'Red'
     Write-RecentSqlErrorLogTail
+    Invoke-SqlSectorRecoveryIfNeeded "SQL Server update package exit code $($proc.ExitCode)" | Out-Null
     exit 1
 }
 
@@ -507,6 +537,7 @@ function Start-SqlServiceAndWait([string]$ServiceName) {
         Write-Log "ERROR: Could not start SQL Server service ${ServiceName}: $($_.Exception.Message)" 'Red'
         Write-Log "       If this is a new NVMe/modern disk machine, check diagnostics for fsutil sector info and SQL ERRORLOG." 'Yellow'
         Write-RecentSqlErrorLogTail
+        Invoke-SqlSectorRecoveryIfNeeded "SQL Server service start failure" | Out-Null
         exit 1
     }
 
@@ -523,6 +554,7 @@ function Start-SqlServiceAndWait([string]$ServiceName) {
 
     Write-Log "ERROR: SQL Server service $ServiceName did not reach Running state." 'Red'
     Write-RecentSqlErrorLogTail
+    Invoke-SqlSectorRecoveryIfNeeded "SQL Server service did not reach Running" | Out-Null
     exit 1
 }
 

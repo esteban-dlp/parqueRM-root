@@ -11,7 +11,13 @@
     Root installation directory. Default: C:\ParqueRM
 
 .PARAMETER ServerIp
-    LAN IP of this server. Used in all public URLs.
+    Optional LAN IP of this server. Used only for diagnostics and IP fallback URLs.
+
+.PARAMETER CanonicalHost
+    Stable local hostname used as the recommended public URL.
+
+.PARAMETER AliasHosts
+    Additional local hostnames that should resolve to this machine.
 
 .PARAMETER FrontendPort
     Port Caddy/frontend listens on. Default: 80
@@ -37,6 +43,8 @@
 param(
     [string]$InstallDir      = 'C:\ParqueRM',
     [string]$ServerIp        = '',
+    [string]$CanonicalHost   = 'parque.rm.local',
+    [string[]]$AliasHosts    = @('parquerm.local'),
     [int]$FrontendPort       = 80,
     [int]$BackendPort        = 3000,
     [string]$DbName          = 'ParqueRM',
@@ -80,6 +88,114 @@ function ConvertTo-DotEnvValue([string]$Value) {
     return '"' + $escaped + '"'
 }
 
+function Get-HttpUrl([string]$HostName, [int]$Port) {
+    if ($Port -eq 80) { return "http://$HostName" }
+    return "http://${HostName}:$Port"
+}
+
+function Get-AppVersion {
+    $versionPath = Join-Path $InstallDir 'version.json'
+    if (Test-Path $versionPath) {
+        try {
+            $versionInfo = Get-Content $versionPath -Raw | ConvertFrom-Json
+            if ($versionInfo.version) { return [string]$versionInfo.version }
+        } catch {
+            Write-Warning "Could not read version from ${versionPath}: $($_.Exception.Message)"
+        }
+    }
+
+    return '1.0.2'
+}
+
+function Test-IsVirtualAdapterName([string]$AdapterName) {
+    if ([string]::IsNullOrWhiteSpace($AdapterName)) { return $false }
+    $patterns = @(
+        'vEthernet',
+        'VMware',
+        'VirtualBox',
+        'Hyper-V',
+        'WSL',
+        'Loopback',
+        'Pseudo',
+        'Bluetooth',
+        'Teredo',
+        'ISATAP',
+        'Microsoft Wi-Fi Direct',
+        'WAN Miniport',
+        'Tunnel'
+    )
+    foreach ($pattern in $patterns) {
+        if ($AdapterName -like "*$pattern*") { return $true }
+    }
+    return $false
+}
+
+function Get-CurrentIpv4Addresses {
+    $addresses = @()
+    $candidates = @(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.IPAddress -notmatch '^127\.' -and
+            $_.IPAddress -notmatch '^169\.254\.' -and
+            $_.PrefixOrigin -ne 'WellKnown' -and
+            $_.SuffixOrigin -ne 'Random'
+        })
+
+    foreach ($addr in $candidates) {
+        $adapter = Get-NetAdapter -InterfaceIndex $addr.InterfaceIndex -ErrorAction SilentlyContinue
+        if (-not $adapter) { continue }
+        if ($adapter.Status -ne 'Up') { continue }
+        if (Test-IsVirtualAdapterName $adapter.Name) { continue }
+        if (Test-IsVirtualAdapterName $adapter.InterfaceDescription) { continue }
+
+        $addresses += [PSCustomObject]@{
+            IP          = $addr.IPAddress
+            Adapter     = $adapter.Name
+            Description = $adapter.InterfaceDescription
+            Metric      = $addr.InterfaceMetric
+        }
+    }
+
+    return @($addresses |
+        Sort-Object @{ Expression = { if ($_.Description -match 'Wi-Fi|Wireless|802\.11|WLAN') { 1 } else { 0 } } }, Metric, IP |
+        Select-Object -ExpandProperty IP -Unique)
+}
+
+function Set-LocalHostsEntries([string[]]$HostNames) {
+    $names = @($HostNames | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+    if ($names.Count -eq 0) { return $false }
+
+    $hostsPath = Join-Path $env:SystemRoot 'System32\drivers\etc\hosts'
+    $marker = '# ParqueRM local URL'
+    $escapedNames = (($names | ForEach-Object { [regex]::Escape($_) }) -join '|')
+    $hostPattern = "(?i)(^|\s)($escapedNames)(\s|$)"
+
+    try {
+        $lines = @()
+        if (Test-Path $hostsPath) {
+            $lines = @(Get-Content -Path $hostsPath -ErrorAction Stop)
+        }
+
+        $kept = @()
+        foreach ($line in $lines) {
+            if ($line -match [regex]::Escape($marker)) { continue }
+            if ($line.TrimStart().StartsWith('#')) {
+                $kept += $line
+                continue
+            }
+            if ($line -match $hostPattern) { continue }
+            $kept += $line
+        }
+
+        $newLine = "127.0.0.1`t$($names -join ' ') $marker"
+        Set-Content -Path $hostsPath -Value @($kept + $newLine) -Encoding ASCII -Force
+        Write-Host "  [OK] hosts -> 127.0.0.1 $($names -join ', ')" -ForegroundColor Green
+        return $true
+    } catch {
+        Write-Warning "Could not update hosts file for $($names -join ', '): $($_.Exception.Message)"
+        return $false
+    }
+}
+
 $envPath = Join-Path $BackendDir '.env'
 if ($PreserveExistingSecrets -and (Test-Path $envPath)) {
     $existingJwtSecret = Read-DotEnvValue $envPath 'JWT_SECRET'
@@ -89,10 +205,6 @@ if ($PreserveExistingSecrets -and (Test-Path $envPath)) {
     if (-not [string]::IsNullOrWhiteSpace($existingJwtRefreshSecret)) { $JwtRefreshSecret = $existingJwtRefreshSecret }
 }
 
-if ([string]::IsNullOrWhiteSpace($ServerIp)) {
-    Write-Error "ServerIp is required."
-    exit 1
-}
 if ([string]::IsNullOrWhiteSpace($DbPassword)) {
     Write-Error "DbPassword is required."
     exit 1
@@ -107,10 +219,36 @@ if ([string]::IsNullOrWhiteSpace($JwtRefreshSecret) -or $JwtRefreshSecret.Length
 }
 
 # --- URL assembly -------------------------------------------------------------
-$FrontendUrl = if ($FrontendPort -eq 80) { "http://$ServerIp" } else { "http://${ServerIp}:$FrontendPort" }
+$LocalHostnames = @(@($CanonicalHost) + @($AliasHosts)) |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+    ForEach-Object { $_.Trim().ToLowerInvariant() } |
+    Select-Object -Unique
+
+if ($LocalHostnames.Count -eq 0) {
+    Write-Error "At least one local hostname is required."
+    exit 1
+}
+
+$CanonicalHost = $LocalHostnames[0]
+$CurrentIpv4Addresses = @(Get-CurrentIpv4Addresses)
+if ([string]::IsNullOrWhiteSpace($ServerIp) -and $CurrentIpv4Addresses.Count -gt 0) {
+    $ServerIp = $CurrentIpv4Addresses[0]
+}
+
+$FrontendUrl = Get-HttpUrl $CanonicalHost $FrontendPort
 $BackendUrl  = "$FrontendUrl/api"
 $SwaggerUrl  = "$FrontendUrl/api/docs"
 $FrontendApiUrl = '/api'
+$AliasUrls = @($LocalHostnames | Select-Object -Skip 1 | ForEach-Object { Get-HttpUrl $_ $FrontendPort })
+$IpFallbackUrls = @(
+    (Get-HttpUrl 'localhost' $FrontendPort),
+    (Get-HttpUrl '127.0.0.1' $FrontendPort)
+)
+foreach ($ip in $CurrentIpv4Addresses) {
+    $IpFallbackUrls += (Get-HttpUrl $ip $FrontendPort)
+}
+$FallbackUrls = @(@($AliasUrls) + @($IpFallbackUrls) | Select-Object -Unique)
+$HostsConfigured = Set-LocalHostsEntries $LocalHostnames
 
 function ConvertTo-SqlLiteral([string]$Value) {
     return "N'$($Value.Replace("'", "''"))'"
@@ -193,11 +331,17 @@ Write-Host "  [OK] Frontend config.json -> $frontendConfigPath" -ForegroundColor
 # --- Central config JSON ------------------------------------------------------
 $centralConfig = [ordered]@{
     appName     = 'ParqueRM'
-    version     = '1.0.0'
+    version     = Get-AppVersion
+    canonicalHost = $CanonicalHost
+    localHostnames = @($LocalHostnames)
     serverIp    = $ServerIp
+    currentIpv4Addresses = @($CurrentIpv4Addresses)
+    recommendedUrl = $FrontendUrl
     frontendUrl = $FrontendUrl
     backendUrl  = $BackendUrl
     swaggerUrl  = $SwaggerUrl
+    fallbackUrls = @($FallbackUrls)
+    hostsConfigured = [bool]$HostsConfigured
     installDir  = $InstallDir
     dbName      = $DbName
     dbUser      = $DbUser

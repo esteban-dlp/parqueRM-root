@@ -2,7 +2,8 @@
 
 Documento tecnico y operativo para construir, instalar, diagnosticar y mantener ParqueRM en Windows.
 
-Fecha de referencia: 2026-06-02  
+Fecha de referencia: 2026-06-12  
+Version objetivo del instalador: 1.0.2  
 Ruta del instalador en el repo: `parqueRM-root/installer`  
 Ruta por defecto en equipos instalados: `C:\ParqueRM`
 
@@ -16,7 +17,7 @@ El objetivo operativo es que el usuario final haga esto:
 
 1. Ejecutar `ParqueRM-Setup-vX.X.X.exe`.
 2. Elegir instalacion completa o solo cliente.
-3. Ingresar la IP del servidor si no fue detectada automaticamente.
+3. Usar la URL local estable `http://parque.rm.local`.
 4. Ingresar la contrasena tecnica de SQL Server.
 5. Leer las credenciales iniciales del usuario `admin` de ParqueRM.
 6. Esperar a que el instalador configure base de datos, archivos, servicios, firewall y accesos directos.
@@ -36,7 +37,7 @@ Este documento cubre:
 - Flujo exacto de instalacion.
 - Manejo de SQL Server nuevo y SQL Server existente.
 - Manejo de contrasenas.
-- Configuracion automatica de IP.
+- Configuracion automatica de URL local estable.
 - Servicios de Windows.
 - Logs, diagnostico y soporte remoto/offline.
 - Backup y restore.
@@ -69,7 +70,7 @@ El flujo de red esperado es:
 ```text
 Navegador LAN
     |
-    | http://IP_DEL_SERVIDOR
+    | http://parque.rm.local
     v
 Caddy / ParqueRMFrontend, puerto 80
     |
@@ -82,7 +83,7 @@ Backend NestJS / ParqueRMBackend, puerto 3000
 SQL Server + base ParqueRM
 ```
 
-SQL Server no se expone a la LAN por defecto. El frontend y backend si se abren en firewall.
+SQL Server no se expone a la LAN por defecto. El backend queda interno detras de Caddy; el firewall abre Caddy TCP 80 y mDNS UDP 5353.
 
 ---
 
@@ -93,7 +94,7 @@ El instalador tiene dos modos:
 | Modo | Uso | Que instala |
 |---|---|---|
 | Instalacion completa, servidor | Equipo principal donde correra ParqueRM | Backend, frontend, base de datos, servicios, firewall, herramientas |
-| Solo cliente | PC que solo necesita abrir el sistema del servidor | Acceso directo `.url` hacia `http://IP_DEL_SERVIDOR` |
+| Solo cliente | PC que solo necesita abrir el sistema del servidor | Acceso directo `.url` hacia `http://parque.rm.local` |
 
 ### 4.1 Instalacion completa
 
@@ -101,7 +102,7 @@ Este modo instala todo en el equipo servidor. Es el modo que se debe usar en la 
 
 Preguntas principales:
 
-- IP del servidor, si no se detecta automaticamente.
+- URL local estable `http://parque.rm.local`.
 - Contrasena SQL Server `sa`.
 - Credenciales iniciales del usuario web `admin`.
 - Secretos JWT, generados automaticamente y editables.
@@ -111,7 +112,7 @@ Preguntas principales:
 Este modo no instala backend, frontend, SQL Server ni servicios. Solo crea un acceso directo que abre:
 
 ```text
-http://IP_DEL_SERVIDOR
+http://parque.rm.local
 ```
 
 Se usa en equipos secundarios de la misma red local.
@@ -243,7 +244,7 @@ El script `build-installer.ps1` ejecuta nueve pasos:
 El resultado esperado es:
 
 ```text
-parqueRM-root\release\ParqueRM-Setup-v1.0.0.exe
+parqueRM-root\release\ParqueRM-Setup-v1.0.2.exe
 ```
 
 La version depende de `version.json`.
@@ -363,7 +364,7 @@ dbo.park_config.system_lan_url
 El valor queda como:
 
 ```text
-http://IP_DEL_SERVIDOR
+http://parque.rm.local
 ```
 
 El frontend se configura con API same-origin:
@@ -390,8 +391,9 @@ Crea dos servicios mediante WinSW:
 |---|---|---|---:|
 | `ParqueRMBackend` | ParqueRM Backend | `node dist\main.js` | 3000 |
 | `ParqueRMFrontend` | ParqueRM Frontend | `caddy run --config C:\ParqueRM\config\Caddyfile` | 80 |
+| `ParqueRMLocalName` | ParqueRM Local Name | mDNS responder para `parque.rm.local` | UDP 5353 |
 
-Ambos servicios quedan con inicio automatico y politica de reinicio ante fallos.
+Los servicios quedan con inicio automatico y politica de reinicio ante fallos.
 
 Antes de instalarlos valida que exista:
 
@@ -421,8 +423,8 @@ Caracteristicas:
 - Corre con privilegios altos.
 - Se ejecuta al iniciar Windows.
 - Espera 30 segundos para que la red levante.
-- Verifica si la IP LAN cambio.
-- Si cambio, regenera configuracion preservando secretos.
+- Refresca las entradas `hosts` para `parque.rm.local` y `parquerm.local`.
+- Registra las IPv4 actuales para diagnostico.
 - Intenta iniciar servicios si estan detenidos.
 
 Log:
@@ -442,7 +444,8 @@ C:\ParqueRM\tools\installer-scripts\show-final-url.ps1
 Valida:
 
 - Existe `C:\ParqueRM\config\db-ready.json`.
-- Existen y estan corriendo `ParqueRMBackend` y `ParqueRMFrontend`.
+- Existen y estan corriendo `ParqueRMBackend`, `ParqueRMFrontend` y `ParqueRMLocalName`.
+- `parque.rm.local` resuelve a IPv4.
 - Responde frontend.
 - Responde backend health.
 - Responde database health.
@@ -450,9 +453,9 @@ Valida:
 URLs probadas:
 
 ```text
-http://127.0.0.1/
-http://127.0.0.1/api/health
-http://127.0.0.1/api/health/database
+http://parque.rm.local/
+http://parque.rm.local/api/health
+http://parque.rm.local/api/health/database
 ```
 
 Si falla, el instalador no debe declarar exito silenciosamente; debe abrir diagnostico o indicar logs.
@@ -646,10 +649,20 @@ El frontend usa `/api`, por lo que no depende directamente de la IP para llamar 
 
 ### 12.3 Si cambia la IP por DHCP
 
-Hay dos mecanismos:
+La URL recomendada no cambia:
 
-1. Tarea programada `ParqueRM_IpCheck`, que corre al iniciar Windows.
-2. Herramienta manual `change-server-ip.bat`.
+```text
+http://parque.rm.local
+```
+
+Mecanismos:
+
+1. Entrada `hosts` local para que el servidor siempre abra `parque.rm.local` como `127.0.0.1`.
+2. Servicio `ParqueRMLocalName`, que responde mDNS con la IPv4 actual para clientes LAN compatibles.
+3. Tarea programada `ParqueRM_IpCheck`, que refresca `hosts` al iniciar Windows.
+4. Herramienta manual `change-server-ip.bat`, ahora usada para reparar la URL local.
+
+Limitacion tecnica: `.local` usa multicast DNS. En el servidor instalado la URL queda garantizada por `hosts`; en otros equipos puede depender de que Windows, el router, antivirus o politicas de red permitan UDP 5353 multicast. Si no resuelve, `collect-diagnostics.bat` muestra las URLs fallback por IP.
 
 Herramienta manual:
 
@@ -659,10 +672,9 @@ C:\ParqueRM\tools\change-server-ip.bat
 
 Esta herramienta:
 
-- Muestra IPs detectadas.
-- Pide nueva IP.
-- Pide contrasena SQL `sa`.
-- Regenera configuracion.
+- Refresca las entradas `hosts`.
+- Reinicia `ParqueRMLocalName`.
+- No pide contrasena SQL.
 - Preserva secretos JWT.
 - Actualiza `park_config.system_lan_url`.
 - Reinicia servicios.
@@ -712,13 +724,13 @@ Restart-Service ParqueRMFrontend
 | Herramienta | Uso |
 |---|---|
 | `open-parquerm.bat` | Verifica servicios y abre ParqueRM |
-| `show-status.bat` | Muestra estado, puertos, IPs y ultimas lineas de logs |
+| `show-status.bat` | Muestra estado, puertos, URL local, IPs y ultimas lineas de logs |
 | `start-services.bat` | Inicia servicios con elevacion |
 | `stop-services.bat` | Detiene servicios con elevacion |
 | `restart-services.bat` | Reinicia servicios con elevacion |
 | `backup-db.bat` | Crea backup manual `.bak` |
 | `restore-db.bat` | Restaura backup `.bak` |
-| `change-server-ip.bat` | Regenera configuracion con otra IP |
+| `change-server-ip.bat` | Repara la URL local `http://parque.rm.local` |
 | `collect-diagnostics.bat` | Genera zip de diagnostico |
 
 ---
@@ -968,8 +980,8 @@ Solucion:
 Sintomas:
 
 ```text
+http://parque.rm.local/api/health falla
 http://127.0.0.1/api/health falla
-http://127.0.0.1:3000/api/health falla
 ```
 
 Revisar:
@@ -1140,7 +1152,7 @@ C:\ParqueRM\tools\show-status.bat
 C:\ParqueRM\tools\open-parquerm.bat
 ```
 
-Este `.bat` intenta iniciar servicios si estan detenidos, espera que responda `http://127.0.0.1/` y abre la URL configurada.
+Este `.bat` intenta iniciar servicios si estan detenidos, espera que responda `http://parque.rm.local/` o `http://127.0.0.1/` como fallback, y abre la URL configurada.
 
 ### 18.3 Reiniciar servicios
 
@@ -1199,12 +1211,12 @@ Invoke-WebRequest http://127.0.0.1/api/health/database -UseBasicParsing
 ### 19.2 Checklist de instalacion en VM
 
 - [ ] Instalar como administrador.
-- [ ] Confirmar que detecta IP correcta.
+- [ ] Confirmar que configura `http://parque.rm.local`.
 - [ ] Probar contrasena SQL nueva.
 - [ ] Probar login inicial `admin` / `admin1` en VM limpia.
 - [ ] Confirmar servicios corriendo.
-- [ ] Abrir `http://127.0.0.1/`.
-- [ ] Abrir `http://IP_LAN/` desde la misma VM.
+- [ ] Abrir `http://parque.rm.local/`.
+- [ ] Confirmar fallback `http://127.0.0.1/` desde la misma VM.
 - [ ] Probar desde otra PC de la LAN si aplica.
 - [ ] Ejecutar `show-status.bat`.
 - [ ] Ejecutar `collect-diagnostics.bat`.
@@ -1397,7 +1409,7 @@ Cuando el cliente reporta que ParqueRM no abre:
 5. Si `/api/health` falla, revisar `ParqueRMBackend`.
 6. Si `/api/health/database` falla, revisar SQL Server y `.env`.
 7. Si login admin falla, resetear password; no intentar recuperarla.
-8. Si IP cambio, ejecutar `change-server-ip.bat`.
+8. Si `parque.rm.local` no resuelve, ejecutar `change-server-ip.bat` y revisar `C:\ParqueRM\logs\network`.
 9. Antes de cambios destructivos, crear backup `.bak`.
 
 El instalador debe ser tratado como sistema offline de produccion: cualquier mejora debe probarse en VM limpia y en VM con SQL Server ya instalado.

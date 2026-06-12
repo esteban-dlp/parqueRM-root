@@ -8,6 +8,7 @@
     Uses WinSW (Windows Service Wrapper) to register:
       - "ParqueRM Backend"  : NestJS on port 3000
       - "ParqueRM Frontend" : Caddy serving the dist folder on port 80
+      - "ParqueRM Local Name": mDNS responder for parque.rm.local
 
     WinSW binary must exist in runtime-cache\winsw\WinSW.exe
     Node.js must exist in runtime-cache\node\ or be installed system-wide.
@@ -34,12 +35,13 @@ $BackendDir   = Join-Path $InstallDir 'app\backend'
 $FrontendDist = Join-Path $InstallDir 'app\frontend\dist'
 $LogBackend   = Join-Path $InstallDir 'logs\backend'
 $LogFrontend  = Join-Path $InstallDir 'logs\frontend'
+$LogNetwork   = Join-Path $InstallDir 'logs\network'
 $ConfigDir    = Join-Path $InstallDir 'config'
 $ServicesDir  = Join-Path $InstallDir 'services'
 $UploadsDir   = Join-Path $InstallDir 'data\uploads'
 $DbReadyPath  = Join-Path $ConfigDir 'db-ready.json'
 
-foreach ($d in @($LogBackend, $LogFrontend, $ServicesDir, (Join-Path $UploadsDir 'logos'))) {
+foreach ($d in @($LogBackend, $LogFrontend, $LogNetwork, $ServicesDir, (Join-Path $UploadsDir 'logos'))) {
     if (-not (Test-Path $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
 }
 
@@ -225,6 +227,23 @@ Install-WinSwService `
     -WorkingDir   (Split-Path $caddyPath -Parent) `
     -LogDir       $LogFrontend
 
+# --- Local name responder service --------------------------------------------
+Write-Host "`nInstalling ParqueRM Local Name service..." -ForegroundColor Cyan
+$localNameScript = Join-Path $InstallDir 'tools\installer-scripts\local-name-responder.ps1'
+if (-not (Test-Path $localNameScript)) {
+    Write-Error "Local name responder script not found at $localNameScript."
+    exit 1
+}
+
+Install-WinSwService `
+    -ServiceId    'ParqueRMLocalName' `
+    -DisplayName  'ParqueRM Local Name' `
+    -Description  'ParqueRM mDNS responder for parque.rm.local' `
+    -Executable   'powershell.exe' `
+    -Arguments    "-NoProfile -ExecutionPolicy Bypass -File `"$localNameScript`" -InstallDir `"$InstallDir`"" `
+    -WorkingDir   (Split-Path $localNameScript -Parent) `
+    -LogDir       $LogNetwork
+
 # --- Start services -----------------------------------------------------------
 Write-Host "`nStarting services..." -ForegroundColor Cyan
 
@@ -301,7 +320,9 @@ Start-ParqueService 'ParqueRMFrontend'
 Wait-HttpOk 'Frontend' 'http://127.0.0.1/' 45
 Wait-HttpOk 'Frontend API proxy' 'http://127.0.0.1/api/health' 45
 
-foreach ($svcName in @('ParqueRMBackend', 'ParqueRMFrontend')) {
+Start-ParqueService 'ParqueRMLocalName'
+
+foreach ($svcName in @('ParqueRMBackend', 'ParqueRMFrontend', 'ParqueRMLocalName')) {
     $svc = Get-Service -Name $svcName -ErrorAction Stop
     if ($svc.Status -ne 'Running') {
         Write-Error "Service $svcName did not stay Running. Current status: $($svc.Status)"
@@ -313,3 +334,4 @@ Write-Host ""
 Write-Host "Services installed and started." -ForegroundColor Green
 Write-Host "  Backend  : ParqueRMBackend" -ForegroundColor White
 Write-Host "  Frontend : ParqueRMFrontend" -ForegroundColor White
+Write-Host "  Local DNS: ParqueRMLocalName" -ForegroundColor White

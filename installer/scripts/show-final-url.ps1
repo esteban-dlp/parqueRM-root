@@ -26,7 +26,7 @@ if (-not (Test-Path $dbReadyPath)) {
     $errors.Add("Base de datos no inicializada correctamente: falta $dbReadyPath")
 }
 
-foreach ($svcName in @('ParqueRMBackend', 'ParqueRMFrontend')) {
+foreach ($svcName in @('ParqueRMBackend', 'ParqueRMFrontend', 'ParqueRMLocalName')) {
     $svc = Get-Service -Name $svcName -ErrorAction SilentlyContinue
     if (-not $svc) {
         $errors.Add("Servicio no instalado: $svcName")
@@ -51,6 +51,18 @@ Test-HttpUrl 'Frontend' $cfg.frontendUrl
 Test-HttpUrl 'Backend health' "$($cfg.backendUrl)/health"
 Test-HttpUrl 'Database health' "$($cfg.backendUrl)/health/database"
 
+try {
+    $canonicalHost = if ($cfg.canonicalHost) { $cfg.canonicalHost } else { 'parque.rm.local' }
+    $resolved = [System.Net.Dns]::GetHostAddresses($canonicalHost) |
+        Where-Object { $_.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork } |
+        ForEach-Object { $_.IPAddressToString }
+    if (-not $resolved) {
+        $errors.Add("La URL local no resuelve a IPv4: $canonicalHost")
+    }
+} catch {
+    $errors.Add("La URL local no resuelve: $canonicalHost -- $($_.Exception.Message)")
+}
+
 if ($errors.Count -gt 0) {
     Write-Host ""
     Write-Host "============================================================" -ForegroundColor Red
@@ -64,6 +76,7 @@ if ($errors.Count -gt 0) {
     Write-Host "  Revise estos logs:" -ForegroundColor White
     Write-Host "    $InstallDir\logs\backend\ParqueRMBackend.err.log" -ForegroundColor Cyan
     Write-Host "    $InstallDir\logs\db-init\" -ForegroundColor Cyan
+    Write-Host "    $InstallDir\logs\network\" -ForegroundColor Cyan
     Write-Host ""
     exit 1
 }

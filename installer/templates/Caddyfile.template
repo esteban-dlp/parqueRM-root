@@ -1,4 +1,8 @@
 :{{FRONTEND_PORT}} {
+    handle /uploads/* {
+        reverse_proxy 127.0.0.1:{{BACKEND_PORT}}
+    }
+
     handle /api/* {
         reverse_proxy 127.0.0.1:{{BACKEND_PORT}}
     }

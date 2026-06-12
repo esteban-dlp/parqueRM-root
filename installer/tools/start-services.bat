@@ -9,5 +9,6 @@ if %ERRORLEVEL% neq 0 (
 echo Starting ParqueRM services...
 net start ParqueRMBackend
 net start ParqueRMFrontend
+net start ParqueRMLocalName
 echo Done.
 pause

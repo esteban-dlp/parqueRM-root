@@ -28,7 +28,7 @@ $report = Join-Path $outDir 'diagnostics.txt'
 "InstallDir: $InstallDir" | Add-Content -Path $report
 
 Write-Section $report 'Services'
-Get-Service ParqueRMBackend,ParqueRMFrontend,MSSQLSERVER,'MSSQL$SQLEXPRESS' |
+Get-Service ParqueRMBackend,ParqueRMFrontend,ParqueRMLocalName,MSSQLSERVER,'MSSQL$SQLEXPRESS' |
     Format-Table Status, Name, DisplayName -AutoSize |
     Out-String | Add-Content -Path $report
 
@@ -36,6 +36,39 @@ Write-Section $report 'Ports'
 foreach ($port in 80,3000,1433) {
     "Port ${port}: $(Test-NetConnection 127.0.0.1 -Port $port -InformationLevel Quiet -WarningAction SilentlyContinue)" |
         Add-Content -Path $report
+}
+"UDP 5353 listeners:" | Add-Content -Path $report
+netstat -ano -p udp 2>&1 | Select-String -Pattern ':5353\s' | Out-String | Add-Content -Path $report
+
+Write-Section $report 'Network And Local URL'
+$configPath = Join-Path $InstallDir 'config\parquerm.config.json'
+$configuredUrls = @('http://parque.rm.local/', 'http://parque.rm.local/api/health', 'http://parque.rm.local/api/health/database')
+try {
+    "ComputerName: $env:COMPUTERNAME" | Add-Content -Path $report
+    "Current IPv4 addresses:" | Add-Content -Path $report
+    Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+        Where-Object { $_.IPAddress -notmatch '^127\.' -and $_.IPAddress -notmatch '^169\.254\.' } |
+        Select-Object IPAddress, InterfaceAlias, PrefixOrigin, SuffixOrigin |
+        Format-Table -AutoSize |
+        Out-String | Add-Content -Path $report
+
+    foreach ($hostName in 'parque.rm.local', 'parquerm.local') {
+        try {
+            $addresses = [System.Net.Dns]::GetHostAddresses($hostName) |
+                Where-Object { $_.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork } |
+                ForEach-Object { $_.IPAddressToString }
+            "$hostName -> $($addresses -join ', ')" | Add-Content -Path $report
+        } catch {
+            "$hostName -> ERROR: $($_.Exception.Message)" | Add-Content -Path $report
+        }
+    }
+
+    "hosts entries:" | Add-Content -Path $report
+    Get-Content (Join-Path $env:SystemRoot 'System32\drivers\etc\hosts') -ErrorAction SilentlyContinue |
+        Select-String -Pattern 'parque\.rm\.local|parquerm\.local' |
+        Out-String | Add-Content -Path $report
+} catch {
+    "Network diagnostics failed: $($_.Exception.Message)" | Add-Content -Path $report
 }
 
 Write-Section $report 'Disk Sector Info'
@@ -56,7 +89,26 @@ try {
 }
 
 Write-Section $report 'HTTP Health'
-foreach ($url in 'http://127.0.0.1/', 'http://127.0.0.1/api/health', 'http://127.0.0.1/api/health/database') {
+if (Test-Path $configPath) {
+    try {
+        $cfgForUrls = Get-Content $configPath -Raw | ConvertFrom-Json
+        $configuredUrls = @(
+            "$($cfgForUrls.frontendUrl)/",
+            "$($cfgForUrls.backendUrl)/health",
+            "$($cfgForUrls.backendUrl)/health/database",
+            'http://127.0.0.1/',
+            'http://127.0.0.1/api/health',
+            'http://127.0.0.1/api/health/database'
+        )
+        if ($cfgForUrls.fallbackUrls) {
+            foreach ($fallbackUrl in @($cfgForUrls.fallbackUrls)) {
+                $configuredUrls += "$fallbackUrl/"
+            }
+        }
+        $configuredUrls = @($configuredUrls | Select-Object -Unique)
+    } catch {}
+}
+foreach ($url in $configuredUrls) {
     try {
         $r = Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 10
         "$url -> $($r.StatusCode) $($r.StatusDescription)" | Add-Content -Path $report
@@ -67,7 +119,6 @@ foreach ($url in 'http://127.0.0.1/', 'http://127.0.0.1/api/health', 'http://127
 }
 
 Write-Section $report 'Config'
-$configPath = Join-Path $InstallDir 'config\parquerm.config.json'
 if (Test-Path $configPath) {
     Get-Content $configPath -Raw | Add-Content -Path $report
 } else {
@@ -149,9 +200,18 @@ Get-ChildItem (Join-Path $InstallDir 'logs\frontend') -Filter '*.log' |
         Get-Content $_.FullName -Tail 120 | Add-Content -Path $report
     }
 
+Write-Section $report 'Latest Network Logs'
+Get-ChildItem (Join-Path $InstallDir 'logs\network') -Filter '*.log' |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 3 |
+    ForEach-Object {
+        "File: $($_.FullName)" | Add-Content -Path $report
+        Get-Content $_.FullName -Tail 120 | Add-Content -Path $report
+    }
+
 Write-Section $report 'Recent ParqueRM Windows Events'
 Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = (Get-Date).AddHours(-6) } |
-    Where-Object { $_.Message -match 'ParqueRM|node|caddy|WinSW|MSSQL|SQL Server' } |
+    Where-Object { $_.Message -match 'ParqueRM|node|caddy|WinSW|MSSQL|SQL Server|mDNS|5353' } |
     Select-Object -First 50 TimeCreated, ProviderName, Id, Message |
     Format-List |
     Out-String | Add-Content -Path $report

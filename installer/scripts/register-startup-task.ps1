@@ -2,7 +2,7 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Registra la tarea de inicio de Windows que verifica y actualiza la IP de ParqueRM.
+    Registra la tarea de inicio de Windows que verifica la URL local de ParqueRM.
 
 .PARAMETER InstallDir
     Directorio raiz de instalacion. Default: C:\ParqueRM
@@ -48,7 +48,7 @@ Register-ScheduledTask `
     -Trigger   $trigger `
     -Settings  $settings `
     -Principal $principal `
-    -Description 'Verifica la IP del servidor al arrancar y actualiza la configuracion de ParqueRM si cambio.' `
+    -Description 'Verifica la URL local estable de ParqueRM, refresca hosts y arranca servicios.' `
     | Out-Null
 
 Write-Host "  [OK] Tarea '$taskName' registrada. Se ejecuta 30 segundos despues de cada inicio del sistema." -ForegroundColor Green

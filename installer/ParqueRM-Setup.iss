@@ -3,7 +3,7 @@
 ; Inno Setup 6 script -- ParqueRM production installer
 ;
 ; Defines passed from build-installer.ps1:
-;   /DAppVersion=1.0.0
+;   /DAppVersion=1.0.2
 ;   /DBuildNumber=202501011200
 ;   /DReleaseDir=C:\...\parqueRM-root\release
 ;
@@ -13,7 +13,7 @@
 ; ============================================================
 
 #ifndef AppVersion
-  #define AppVersion "1.0.0"
+  #define AppVersion "1.0.2"
 #endif
 #ifndef BuildNumber
   #define BuildNumber "dev"
@@ -24,7 +24,7 @@
 
 #define AppName      "ParqueRM"
 #define AppPublisher "Parque Nacional"
-#define AppURL       "http://localhost"
+#define AppURL       "http://parque.rm.local"
 #define DefaultDir   "C:\ParqueRM"
 #define DefaultAdminPassword "admin1"
 #define SetupExeName "ParqueRM-Setup-v" + AppVersion
@@ -100,6 +100,7 @@ Source: "{#ReleaseDir}\version.json"; DestDir: "{app}"; \
 [Dirs]
 Name: "{app}\logs\backend";  Components: server
 Name: "{app}\logs\frontend"; Components: server
+Name: "{app}\logs\network";  Components: server
 Name: "{app}\logs\db-init";  Components: server
 Name: "{app}\backups";       Components: server
 Name: "{app}\config";        Components: server
@@ -114,7 +115,7 @@ Name: "{group}\Iniciar servicios";       Filename: "{app}\tools\start-services.b
 Name: "{group}\Detener servicios";       Filename: "{app}\tools\stop-services.bat";       Components: server
 Name: "{group}\Crear backup";            Filename: "{app}\tools\backup-db.bat";           Components: server
 Name: "{group}\Restaurar backup";        Filename: "{app}\tools\restore-db.bat";          Components: server
-Name: "{group}\Cambiar IP del servidor"; Filename: "{app}\tools\change-server-ip.bat";    Components: server
+Name: "{group}\Reparar URL local";       Filename: "{app}\tools\change-server-ip.bat";    Components: server
 Name: "{group}\Diagnostico ParqueRM";     Filename: "{app}\tools\collect-diagnostics.bat"; Components: server
 
 ; --- Desktop shortcut (server) --------------------------------------------------
@@ -221,18 +222,18 @@ begin
 
   { Server IP page -- shown only in server mode }
   ServerIpPage := CreateInputQueryPage(wpSelectComponents,
-    'Direccion IP del servidor',
-    'Ingrese la IP de esta computadora en la red local.',
-    'Las demas computadoras usaran esta IP para conectarse. Puede verla con ipconfig.');
+    'URL local de ParqueRM',
+    'ParqueRM usara una URL local estable.',
+    'La URL recomendada sera http://parque.rm.local. La IP solo se conserva como fallback de diagnostico.');
   ServerIpPage.Add('IP del servidor:', False);
   ServerIpPage.Values[0] := GServerIp;
 
   { Client-only server IP page -- shown only in client-only mode }
   ClientServerIpPage := CreateInputQueryPage(wpSelectComponents,
-    'IP del servidor ParqueRM',
-    'Ingrese la IP del servidor donde ParqueRM esta instalado.',
-    'Ejemplo: 192.168.68.51');
-  ClientServerIpPage.Add('IP del servidor ParqueRM:', False);
+    'URL del servidor ParqueRM',
+    'ParqueRM usara la URL local estable.',
+    'El acceso recomendado es http://parque.rm.local.');
+  ClientServerIpPage.Add('URL del servidor ParqueRM:', False);
   ClientServerIpPage.Values[0] := '';
 
   { DB password page }
@@ -267,11 +268,11 @@ var
   isServer: Boolean;
 begin
   isServer := WizardIsComponentSelected('server');
-  if (PageID = ServerIpPage.ID) and (not isServer) then Result := True
+  if (PageID = ServerIpPage.ID) then Result := True
   else if (PageID = DbPasswordPage.ID) and (not isServer) then Result := True
   else if (PageID = AdminInfoPage.ID) and (not isServer) then Result := True
   else if (PageID = JwtPage.ID) and ((not isServer) or GExistingInstall) then Result := True
-  else if (PageID = ClientServerIpPage.ID) and isServer then Result := True
+  else if (PageID = ClientServerIpPage.ID) then Result := True
   else Result := False;
 end;
 
@@ -301,7 +302,7 @@ begin
 
   if CurPageID = ServerIpPage.ID then begin
     if not IsValidIPv4(Trim(ServerIpPage.Values[0])) then begin
-      MsgBox('Ingrese una IPv4 valida del servidor. Ejemplo: 192.168.68.51', mbError, MB_OK);
+      MsgBox('La URL local estable se configura automaticamente.', mbError, MB_OK);
       Result := False; Exit;
     end;
     GServerIp := Trim(ServerIpPage.Values[0]);
@@ -309,7 +310,7 @@ begin
 
   if CurPageID = ClientServerIpPage.ID then begin
     if not IsValidIPv4(Trim(ClientServerIpPage.Values[0])) then begin
-      MsgBox('Ingrese una IPv4 valida del servidor. Ejemplo: 192.168.68.51', mbError, MB_OK);
+      MsgBox('Use el acceso recomendado: http://parque.rm.local', mbError, MB_OK);
       Result := False; Exit;
     end;
     GServerIp := Trim(ClientServerIpPage.Values[0]);
@@ -429,7 +430,7 @@ var
   ps: String;
 begin
   ps :=
-    '$services=''ParqueRMBackend'',''ParqueRMFrontend'';' +
+      '$services=''ParqueRMBackend'',''ParqueRMFrontend'',''ParqueRMLocalName'';' +
     'foreach($svcName in $services){' +
     '  $svc=Get-Service $svcName -ErrorAction SilentlyContinue;' +
     '  if($svc -and $svc.Status -ne ''Running''){' +
@@ -663,6 +664,13 @@ begin
   scriptsDir := appDir + '\tools\installer-scripts';
 
   RunPowerShellStep(
+    'Configurando URL local...',
+    scriptsDir + '\configure-local-name.ps1',
+    '-InstallDir "' + appDir + '"',
+    False);
+  if GInstallFailed then Exit;
+
+  RunPowerShellStep(
     'Configurando firewall...',
     scriptsDir + '\configure-firewall.ps1',
     '',
@@ -714,7 +722,7 @@ begin
   if WizardIsComponentSelected('server') then begin
     ps :=
       '$install=''' + ExpandConstant('{app}') + ''';' +
-      '$services=''ParqueRMFrontend'',''ParqueRMBackend'';' +
+      '$services=''ParqueRMFrontend'',''ParqueRMBackend'',''ParqueRMLocalName'';' +
       'foreach($svcName in $services){' +
       '  $svc=Get-Service $svcName -ErrorAction SilentlyContinue;' +
       '  if($svc -and $svc.Status -ne ''Stopped''){' +
@@ -730,7 +738,7 @@ begin
       'Unregister-ScheduledTask -TaskName ''ParqueRM_IpCheck'' -Confirm:$false -ErrorAction SilentlyContinue;' +
       '$prefix=([IO.Path]::GetFullPath($install)).TrimEnd(''\'') + ''\'';' +
       '$procs=Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {' +
-      '  ($_.Name -in @(''node.exe'',''caddy.exe'',''ParqueRMBackend.exe'',''ParqueRMFrontend.exe'',''WinSW.exe'',''WinSW-x64.exe'')) -and' +
+      '  ($_.Name -in @(''node.exe'',''caddy.exe'',''powershell.exe'',''ParqueRMBackend.exe'',''ParqueRMFrontend.exe'',''ParqueRMLocalName.exe'',''WinSW.exe'',''WinSW-x64.exe'')) -and' +
       '  (($_.ExecutablePath -and [IO.Path]::GetFullPath($_.ExecutablePath).StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)) -or' +
       '   ($_.CommandLine -and $_.CommandLine.IndexOf($prefix,[StringComparison]::OrdinalIgnoreCase) -ge 0))' +
       '};' +
@@ -757,7 +765,7 @@ begin
     if WizardIsComponentSelected('clientonly') then begin
       urlFile    := ExpandConstant('{app}\open-parquerm-client.url');
       urlContent := '[InternetShortcut]' + #13#10 +
-                    'URL=http://' + GServerIp + #13#10 +
+                    'URL=http://parque.rm.local' + #13#10 +
                     'IconIndex=0' + #13#10;
       SaveStringToFile(urlFile, urlContent, False);
     end;
