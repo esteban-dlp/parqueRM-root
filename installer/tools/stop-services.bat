@@ -10,5 +10,6 @@ echo Stopping ParqueRM services...
 net stop ParqueRMLocalName
 net stop ParqueRMFrontend
 net stop ParqueRMBackend
+sc query ParqueRMDns >nul 2>&1 && net stop ParqueRMDns >nul 2>&1
 echo Done.
 pause

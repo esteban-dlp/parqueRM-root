@@ -5,12 +5,12 @@ set INSTALL_DIR=C:\ParqueRM
 set CONFIG=%INSTALL_DIR%\config\parquerm.config.json
 
 :: Read frontend URL from config and open the stable local URL in default browser
-for /f "usebackq delims=" %%u in (`powershell.exe -NoProfile -Command "try { $c = Get-Content '%CONFIG%' -Raw | ConvertFrom-Json; if($c.frontendUrl){ $c.frontendUrl } else { 'http://parque.rm.local' } } catch { 'http://parque.rm.local' }"`) do set FRONTEND_URL=%%u
+for /f "usebackq delims=" %%u in (`powershell.exe -NoProfile -Command "try { $c = Get-Content '%CONFIG%' -Raw | ConvertFrom-Json; if($c.frontendUrl){ $c.frontendUrl } else { 'http://parquerm.local' } } catch { 'http://parquerm.local' }"`) do set FRONTEND_URL=%%u
 
 echo Checking ParqueRM services...
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
   "$ErrorActionPreference='Stop';" ^
-  "$services='ParqueRMBackend','ParqueRMFrontend','ParqueRMLocalName';" ^
+  "$services='ParqueRMBackend','ParqueRMFrontend','ParqueRMLocalName','ParqueRMDns';" ^
   "foreach($name in $services){ $svc=Get-Service $name -ErrorAction SilentlyContinue; if($svc -and $svc.Status -ne 'Running'){ Start-Service $name -ErrorAction SilentlyContinue } };" ^
   "$deadline=(Get-Date).AddSeconds(45);" ^
   "do { try { $r=Invoke-WebRequest -UseBasicParsing -Uri '%FRONTEND_URL%/' -TimeoutSec 3; if($r.StatusCode -ge 200 -and $r.StatusCode -lt 400){ exit 0 } } catch {}; try { $r=Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1/' -TimeoutSec 3; if($r.StatusCode -ge 200 -and $r.StatusCode -lt 400){ exit 0 } } catch {}; Start-Sleep -Seconds 2 } while((Get-Date) -lt $deadline);" ^

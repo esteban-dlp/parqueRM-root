@@ -15,7 +15,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $ServicesDir = Join-Path $InstallDir 'services'
-$serviceIds  = @('ParqueRMBackend', 'ParqueRMFrontend', 'ParqueRMLocalName')
+$serviceIds  = @('ParqueRMBackend', 'ParqueRMFrontend', 'ParqueRMDns', 'ParqueRMLocalName')
 
 foreach ($id in $serviceIds) {
     $svc = Get-Service -Name $id -ErrorAction SilentlyContinue

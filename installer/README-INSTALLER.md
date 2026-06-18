@@ -2,36 +2,57 @@
 
 This folder builds the single offline Windows installer for ParqueRM.
 
-The output is one versioned executable:
-
-```bat
-parqueRM-root\release\ParqueRM-Setup-v1.0.3.exe
+```text
+parqueRM-root\release\ParqueRM-Setup-v1.0.7.exe
 ```
 
-There is no separate updater. Run the same setup executable on a clean machine or over an existing ParqueRM installation.
+Run the same executable for a clean installation or an update. Existing SQLite data, JWT secrets, and refresh-token secrets are preserved.
 
 ## Architecture
 
-The production installer avoids Docker and packages:
+The 1.0.7 installer is LAN/offline-first and does not require router DNS changes for the normal flow.
 
-- SQL Server Express, installed from the offline runtime cache when needed.
-- Portable Node.js, used to run the NestJS backend.
-- Caddy, used to serve the React frontend on port 80.
-- WinSW, used to register backend and frontend as Windows services.
-- A local-name service that publishes `parque.rm.local`/`parquerm.local` through mDNS when the LAN supports it.
+- SQLite command-line tools (`sqlite3.exe`) for the local database.
+- Portable Node.js for the NestJS backend.
+- Caddy for the React frontend and same-origin `/api` reverse proxy.
+- WinSW for Windows services.
+- `ParqueRMLocalName` for mDNS aliases and UDP discovery.
+- Optional legacy CoreDNS files may be bundled/preserved for 1.0.6 upgrades, but CoreDNS is not required for new installs.
+
+Canonical URL:
+
+```text
+http://parquerm.local
+```
+
+Legacy alias:
+
+```text
+http://parque.rm.local
+```
+
+Fallback:
+
+```text
+http://<server-lan-ip>
+```
 
 ## Runtime Cache
 
-Place these files under `installer\runtime-cache\` before building:
+Required files under `installer\runtime-cache\`:
 
 | Folder | Required file |
-|--------|---------------|
-| `sqlserver-express` | `SQLEXPR_x64_ENU.exe` or similar |
-| `sqlserver-express\updates` | Optional SQL Server 2022 CU package, for example `SQLServer2022-KBxxxxxxx-x64.exe` |
+|---|---|
 | `node` | `node.exe` |
 | `caddy` | `caddy.exe` |
-| `winsw` | `WinSW.exe` or `WinSW-x64.exe` |
-| `sqlcmd` | `sqlcmd.exe` |
+| `winsw` | `WinSW.exe` or equivalent |
+| `sqlite` | `sqlite3.exe` |
+
+Optional legacy folder:
+
+| Folder | Purpose |
+|---|---|
+| `coredns` | Preserved only for compatibility with earlier 1.0.6 DNS-router installs |
 
 ## Build
 
@@ -40,161 +61,116 @@ cd parqueRM-root\installer
 build-installer.bat
 ```
 
-Useful flags:
-
 | Flag | Purpose |
-|------|---------|
-| `-SkipRuntimeValidation` | Build without requiring runtime-cache files |
-| `-SkipInstallerCompile` | Generate `release\` files but skip Inno Setup |
+|---|---|
+| `-SkipRuntimeValidation` | Build without requiring runtime files |
+| `-SkipInstallerCompile` | Generate `release\` without compiling Inno Setup |
 | `-SkipNpmInstall` | Reuse existing backend/frontend build artifacts |
-
-## Fresh Or Existing Install
-
-The same installer handles both cases.
-
-| Area | Fresh install | Existing install |
-|------|---------------|------------------|
-| SQL Server | Installed from runtime cache | Reused if present |
-| Database | Created and seeded | Existing data kept; missing init/migrations are applied |
-| Backend `.env` | Generated | Regenerated for stable local URL; existing JWT secrets preserved |
-| Frontend `config.json` | Generated with same-origin `/api` | Regenerated with same-origin `/api` |
-| Services | Installed | Reinstalled and restarted |
-| Runtime binaries | Installed | Refreshed from installer |
 
 ## Installation Flow
 
-The setup:
+Server installation:
 
-1. Configures the stable local URL `http://parque.rm.local`.
-2. Opens firewall rules for Caddy TCP 80 and mDNS UDP 5353.
-3. Installs or reuses SQL Server Express.
-4. Applies the SQL Server NVMe/sector-size compatibility registry fix before SQL install/update when required, then asks for a reboot.
-5. Initializes the database, prepares the initial `admin` password only when needed, and runs migrations.
-6. Generates backend/frontend configuration.
-7. Installs and starts Windows services.
-8. Validates frontend, backend health, and database health before reporting success.
-
-If validation fails, the final screen points to the relevant logs instead of claiming the app is ready.
+1. Preserves the existing database and secrets during updates.
+2. Initializes or migrates `C:\ParqueRM\data\parquerm.db` with SQLite scripts.
+3. Generates backend/frontend config for `http://parquerm.local`.
+4. Keeps frontend API config as `"/api"` so Caddy owns the same-origin proxy.
+5. Opens firewall TCP 80, UDP 5353, and UDP 47880.
+6. Installs `ParqueRMBackend`, `ParqueRMFrontend`, and `ParqueRMLocalName`.
+7. Preserves `ParqueRMDns` if it already exists, but does not require it.
+8. Shows the primary URL and IP fallback. It does not open router, TP-Link, or DHCP setup pages.
 
 ## Services
 
-Services created:
+- `ParqueRMBackend`: NestJS on `0.0.0.0:3000`, used internally.
+- `ParqueRMFrontend`: Caddy on LAN TCP 80.
+- `ParqueRMLocalName`: mDNS for `parquerm.local`/`parque.rm.local` plus UDP discovery on 47880.
+- `ParqueRMDns`: optional legacy service preserved only when already installed.
 
-- `ParqueRMBackend`: runs `node dist\main.js` in `C:\ParqueRM\app\backend`.
-- `ParqueRMFrontend`: runs Caddy with `C:\ParqueRM\config\Caddyfile`.
-- `ParqueRMLocalName`: publishes the current IPv4 address for `parque.rm.local` and `parquerm.local` through mDNS.
+## Networking
 
-## Configuration
+Caddy exposes the app through port 80 and proxies:
 
-The installer writes:
+```text
+/api/* -> 127.0.0.1:3000
+```
+
+The frontend must not contain a hard-coded IP or host. Its generated `config.json` remains:
+
+```json
+{ "apiUrl": "/api" }
+```
+
+Firewall defaults:
+
+| Port | Protocol | Purpose |
+|---:|---|---|
+| 80 | TCP | Caddy web frontend and `/api` proxy |
+| 5353 | UDP | mDNS best-effort local names |
+| 47880 | UDP | ParqueRM discovery |
+
+TCP 3000 is not opened to LAN by default.
+
+## Client-Only Fallback
+
+Use **Solo cliente** on a Windows PC only when `http://parquerm.local` does not open from that PC.
+
+Client-only mode:
+
+1. Requires administrator permission because it edits `hosts`.
+2. Tries a manual IP, last known IP, mDNS, UDP discovery, then a short `/24` TCP 80 scan.
+3. Validates candidates only through `http://<ip>/api/health`.
+4. Writes `parquerm.local` and `parque.rm.local` to `hosts` only when one clear server is found.
+5. If multiple different `instanceId` values are detected, it does not overwrite `hosts`.
+6. Registers `ParqueRM_ClientNameRefresh` to refresh after IP/network changes.
+
+## Generated Configuration
 
 - `C:\ParqueRM\app\backend\.env`
 - `C:\ParqueRM\app\frontend\dist\config.json`
 - `C:\ParqueRM\config\parquerm.config.json`
-- `park_config.system_lan_url` in SQL Server, using `http://parque.rm.local`.
-- Windows `hosts`, mapping `parque.rm.local` and `parquerm.local` to `127.0.0.1` on the server.
 
-The frontend runtime config points to the same origin:
-
-```text
-/api
-```
-
-Caddy serves the frontend on port 80 and proxies `/api/*` to the local backend service on port 3000. The browser opens `http://parque.rm.local`, and the frontend calls the backend with same-origin `/api`.
-
-Recommended access:
-
-```text
-http://parque.rm.local
-```
-
-Backend access goes through the same origin:
-
-```text
-http://parque.rm.local/api
-```
-
-`parque.rm.local` is guaranteed on the installed server through the Windows hosts file. For other computers on the same LAN, the installer also starts an mDNS responder. If a router, Windows policy, antivirus, or client OS blocks mDNS multicast, use the fallback URLs shown by diagnostics.
-
-To repair the local URL entries and restart the name responder:
-
-```bat
-C:\ParqueRM\tools\change-server-ip.bat
-```
-
-The application login user is always:
-
-```text
-admin
-```
-
-The installer configures the `admin` password as:
-
-```text
-admin1
-```
-
-The installer no longer asks for this user's password. During installation, it writes and verifies a bcrypt hash for `admin1`.
-
-## Backups And Restore
-
-Manual backup:
-
-```bat
-C:\ParqueRM\tools\backup-db.bat
-```
-
-Manual restore:
-
-```bat
-C:\ParqueRM\tools\restore-db.bat
-```
-
-Backups are written to:
-
-```text
-C:\ParqueRM\backups
-```
+`PARQUERM_INSTANCE_ID` is generated once if missing and is not a secret. It is used to detect duplicate ParqueRM servers on the same LAN.
 
 ## Troubleshooting
 
-Check service state:
+Open status:
 
-```powershell
-Get-Service ParqueRMBackend,ParqueRMFrontend,ParqueRMLocalName
+```bat
+C:\ParqueRM\tools\show-status.bat
 ```
 
-Check ports:
-
-```powershell
-netstat -ano | findstr ":80 :3000 :1433 :5353"
-```
-
-Check backend:
-
-```powershell
-Invoke-WebRequest http://parque.rm.local/api/health -UseBasicParsing
-Invoke-WebRequest http://parque.rm.local/api/health/database -UseBasicParsing
-```
-
-Useful logs:
-
-```text
-C:\ParqueRM\logs\backend\ParqueRMBackend.err.log
-C:\ParqueRM\logs\backend\ParqueRMBackend.wrapper.log
-C:\ParqueRM\logs\db-init\
-C:\ParqueRM\logs\network\
-```
-
-Collect full diagnostics:
+Collect diagnostics:
 
 ```bat
 C:\ParqueRM\tools\collect-diagnostics.bat
 ```
 
-Build command:
+Useful checks:
 
-```bat
-cd parqueRM-root\installer
-build-installer.bat
+```powershell
+Get-Service ParqueRMBackend,ParqueRMFrontend,ParqueRMLocalName
+Invoke-WebRequest http://127.0.0.1/api/health -UseBasicParsing
+Invoke-WebRequest http://parquerm.local/api/health -UseBasicParsing
+Test-NetConnection 127.0.0.1 -Port 80
 ```
+
+If another PC cannot open `http://parquerm.local`, try `http://<server-lan-ip>` from that PC. If the IP works, install **Solo cliente** on that Windows PC.
+
+## Sharing The IP URL
+
+Inside the Dashboard, the server user can press **Generar URL por IP**.
+
+The frontend calls:
+
+```text
+GET /api/health/local-access
+```
+
+The backend detects the current useful LAN IP and returns a login URL like:
+
+```text
+http://192.168.68.62/login
+```
+
+The button shows the URL, shows the server IP, and tries to copy the URL so the administrator can send it to workers on the same LAN. This does not store or expose secrets.

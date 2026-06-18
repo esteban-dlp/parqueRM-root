@@ -12,7 +12,8 @@ set INSTALL_DIR=C:\ParqueRM
 
 echo ParqueRM - Repair Local URL
 echo ===========================
-echo This refreshes the stable local URL:
+echo This refreshes local hostnames on this computer:
+echo   http://parquerm.local
 echo   http://parque.rm.local
 echo.
 
@@ -24,15 +25,18 @@ if %ERRORLEVEL% neq 0 (
     pause & exit /b 1
 )
 
-echo.
-echo Restarting local-name service...
+echo Restarting local-name responder...
 net stop ParqueRMLocalName >nul 2>&1
-timeout /t 3 /nobreak >nul
+timeout /t 2 /nobreak >nul
 net start ParqueRMLocalName >nul 2>&1
 
 echo [OK] Local URL refreshed.
 echo.
-echo Recommended URL:
-echo   http://parque.rm.local
+echo Main URL:
+echo   http://parquerm.local
 echo.
+echo If another PC cannot open parquerm.local, use http://^<server-ip^>
+echo or install ParqueRM in Modo Solo Cliente on that PC.
+echo.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0installer-scripts\show-status.ps1" -InstallDir "%INSTALL_DIR%"
 pause

@@ -10,5 +10,6 @@ echo Starting ParqueRM services...
 net start ParqueRMBackend
 net start ParqueRMFrontend
 net start ParqueRMLocalName
+sc query ParqueRMDns >nul 2>&1 && net start ParqueRMDns >nul 2>&1
 echo Done.
 pause

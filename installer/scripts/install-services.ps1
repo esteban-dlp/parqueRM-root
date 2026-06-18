@@ -2,13 +2,13 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Installs ParqueRM Windows services (Backend + Frontend) using WinSW.
+    Installs ParqueRM Windows services using WinSW.
 
 .DESCRIPTION
     Uses WinSW (Windows Service Wrapper) to register:
       - "ParqueRM Backend"  : NestJS on port 3000
       - "ParqueRM Frontend" : Caddy serving the dist folder on port 80
-      - "ParqueRM Local Name": mDNS responder for parque.rm.local
+      - "ParqueRM Local Name": mDNS aliases and UDP LAN discovery
 
     WinSW binary must exist in runtime-cache\winsw\WinSW.exe
     Node.js must exist in runtime-cache\node\ or be installed system-wide.
@@ -40,6 +40,7 @@ $ConfigDir    = Join-Path $InstallDir 'config'
 $ServicesDir  = Join-Path $InstallDir 'services'
 $UploadsDir   = Join-Path $InstallDir 'data\uploads'
 $DbReadyPath  = Join-Path $ConfigDir 'db-ready.json'
+$ExistingCoreDnsService = Get-Service -Name 'ParqueRMDns' -ErrorAction SilentlyContinue
 
 foreach ($d in @($LogBackend, $LogFrontend, $LogNetwork, $ServicesDir, (Join-Path $UploadsDir 'logos'))) {
     if (-not (Test-Path $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
@@ -182,7 +183,16 @@ $envXml</service>
             Stop-Service -Name $ServiceId -Force -ErrorAction SilentlyContinue
             Start-Sleep -Seconds 2
         }
-        & $exePath uninstall 2>&1 | Out-Null
+        # WinSW often writes status text to stderr even on success. With
+        # $ErrorActionPreference = 'Stop', a bare "2>&1" would turn that into a
+        # terminating error before "uninstall" finishes, so relax it here.
+        $previousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            & $exePath uninstall 2>&1 | Out-Null
+        } finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
         Start-Sleep -Seconds 2
     }
 
@@ -238,9 +248,9 @@ if (-not (Test-Path $localNameScript)) {
 Install-WinSwService `
     -ServiceId    'ParqueRMLocalName' `
     -DisplayName  'ParqueRM Local Name' `
-    -Description  'ParqueRM mDNS responder for parque.rm.local' `
+    -Description  'ParqueRM mDNS aliases and UDP LAN discovery' `
     -Executable   'powershell.exe' `
-    -Arguments    "-NoProfile -ExecutionPolicy Bypass -File `"$localNameScript`" -InstallDir `"$InstallDir`"" `
+    -Arguments    "-NoProfile -ExecutionPolicy Bypass -File `"$localNameScript`" -InstallDir `"$InstallDir`" -HostNames parquerm.local,parque.rm.local -MdnsPort 5353 -DiscoveryPort 47880" `
     -WorkingDir   (Split-Path $localNameScript -Parent) `
     -LogDir       $LogNetwork
 
@@ -266,7 +276,15 @@ function Start-ParqueService {
         } catch {
             $lastError = $_.Exception.Message
             if (Test-Path $svcExe) {
-                & $svcExe start 2>&1 | Out-Null
+                # Fallback to the WinSW-wrapped exe directly. Same stderr/Stop
+                # landmine as above: relax ErrorActionPreference for the call.
+                $previousErrorActionPreference = $ErrorActionPreference
+                $ErrorActionPreference = 'Continue'
+                try {
+                    & $svcExe start 2>&1 | Out-Null
+                } finally {
+                    $ErrorActionPreference = $previousErrorActionPreference
+                }
             }
         }
 
@@ -313,6 +331,28 @@ function Wait-HttpOk {
     exit 1
 }
 
+function Start-OptionalService {
+    param([string]$ServiceId)
+
+    $svc = Get-Service -Name $ServiceId -ErrorAction SilentlyContinue
+    if (-not $svc) { return }
+
+    try {
+        if ($svc.Status -ne 'Running') {
+            Start-Service -Name $ServiceId -ErrorAction Stop
+            Start-Sleep -Seconds 3
+            $svc.Refresh()
+        }
+        if ($svc.Status -eq 'Running') {
+            Write-Host "  [OK] Optional legacy service $ServiceId is running" -ForegroundColor Green
+        } else {
+            Write-Warning "Optional legacy service $ServiceId did not reach Running. Main ParqueRM LAN flow does not depend on it."
+        }
+    } catch {
+        Write-Warning "Could not start optional legacy service ${ServiceId}: $($_.Exception.Message). Main ParqueRM LAN flow does not depend on it."
+    }
+}
+
 Start-ParqueService 'ParqueRMBackend'
 Wait-HttpOk 'Backend health' 'http://127.0.0.1:3000/api/health' 90
 
@@ -321,6 +361,9 @@ Wait-HttpOk 'Frontend' 'http://127.0.0.1/' 45
 Wait-HttpOk 'Frontend API proxy' 'http://127.0.0.1/api/health' 45
 
 Start-ParqueService 'ParqueRMLocalName'
+if ($ExistingCoreDnsService) {
+    Start-OptionalService 'ParqueRMDns'
+}
 
 foreach ($svcName in @('ParqueRMBackend', 'ParqueRMFrontend', 'ParqueRMLocalName')) {
     $svc = Get-Service -Name $svcName -ErrorAction Stop
@@ -334,4 +377,7 @@ Write-Host ""
 Write-Host "Services installed and started." -ForegroundColor Green
 Write-Host "  Backend  : ParqueRMBackend" -ForegroundColor White
 Write-Host "  Frontend : ParqueRMFrontend" -ForegroundColor White
-Write-Host "  Local DNS: ParqueRMLocalName" -ForegroundColor White
+Write-Host "  Local    : ParqueRMLocalName" -ForegroundColor White
+if ($ExistingCoreDnsService) {
+    Write-Host "  Legacy DNS preserved: ParqueRMDns" -ForegroundColor Gray
+}

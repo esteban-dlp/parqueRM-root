@@ -4,10 +4,6 @@
 .SYNOPSIS
     Creates Windows Firewall inbound rules for ParqueRM.
 
-.PARAMETER EnableSqlServerPort
-    If set, also opens TCP 1433 for LAN access to SQL Server.
-    NOT recommended by default -- keep SQL Server internal.
-
 .PARAMETER EnableBackendPort
     If set, also opens TCP 3000 for direct backend access.
     NOT recommended by default -- Caddy should be the single public entry point.
@@ -17,7 +13,6 @@
 #>
 param(
     [switch]$EnableBackendPort,
-    [switch]$EnableSqlServerPort,
     [switch]$Remove
 )
 
@@ -27,10 +22,11 @@ $ErrorActionPreference = 'Stop'
 $Rules = @(
     @{ Name = 'ParqueRM Caddy TCP 80';      Protocol = 'TCP'; Port = 80;   Always = $true;  Switch = '' },
     @{ Name = 'ParqueRM mDNS UDP 5353';     Protocol = 'UDP'; Port = 5353; Always = $true;  Switch = '' },
-    @{ Name = 'ParqueRM Backend TCP 3000';  Protocol = 'TCP'; Port = 3000; Always = $false; Switch = 'backend' },
-    @{ Name = 'ParqueRM SQL Server TCP 1433'; Protocol = 'TCP'; Port = 1433; Always = $false; Switch = 'sql' }
+    @{ Name = 'ParqueRM Discovery UDP 47880'; Protocol = 'UDP'; Port = 47880; Always = $true; Switch = '' },
+    @{ Name = 'ParqueRM Backend TCP 3000';  Protocol = 'TCP'; Port = 3000; Always = $false; Switch = 'backend' }
 )
 $LegacyRuleNames = @('ParqueRM Frontend TCP 80')
+$RemoveOnlyRuleNames = @('ParqueRM DNS UDP 53', 'ParqueRM DNS TCP 53')
 
 foreach ($legacyName in $LegacyRuleNames) {
     $legacyRule = Get-NetFirewallRule -DisplayName $legacyName -ErrorAction SilentlyContinue
@@ -46,8 +42,7 @@ foreach ($legacyName in $LegacyRuleNames) {
 
 foreach ($rule in $Rules) {
     $shouldApply = $rule.Always -or
-        ($rule.Switch -eq 'backend' -and $EnableBackendPort) -or
-        ($rule.Switch -eq 'sql' -and $EnableSqlServerPort)
+        ($rule.Switch -eq 'backend' -and $EnableBackendPort)
 
     if ($Remove) {
         if (Get-NetFirewallRule -DisplayName $rule.Name -ErrorAction SilentlyContinue) {
@@ -84,13 +79,19 @@ foreach ($rule in $Rules) {
     Write-Host "  [CREATED] $($rule.Name) -- $($rule.Protocol) $($rule.Port)" -ForegroundColor Green
 }
 
+if ($Remove) {
+    foreach ($ruleName in $RemoveOnlyRuleNames) {
+        if (Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue) {
+            Remove-NetFirewallRule -DisplayName $ruleName
+            Write-Host "  [REMOVED] $ruleName" -ForegroundColor Yellow
+        }
+    }
+}
+
 if (-not $Remove) {
     Write-Host ""
     Write-Host "Firewall rules configured." -ForegroundColor Cyan
     if (-not $EnableBackendPort) {
-        Write-Host "  NOTE: Backend port 3000 is NOT exposed to LAN; use http://parque.rm.local/api through Caddy." -ForegroundColor Yellow
-    }
-    if (-not $EnableSqlServerPort) {
-        Write-Host "  NOTE: SQL Server port 1433 is NOT exposed to LAN (recommended)." -ForegroundColor Yellow
+        Write-Host "  NOTE: Backend port 3000 is NOT exposed to LAN; use http://parquerm.local/api through Caddy." -ForegroundColor Yellow
     }
 }

@@ -1,52 +1,32 @@
 services:
-  sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: parqueRM-sqlserver
-    environment:
-      ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "${SQLSERVER_SA_PASSWORD}"
-      MSSQL_PID: "Express"
-    ports:
-      - "1433:1433"
-    volumes:
-      - sqlserver_data:/var/opt/mssql
-    networks:
-      - parqueRM-net
-    restart: unless-stopped
-    # SQL Server 2022 exposes sqlcmd in /opt/mssql-tools18/bin.
-    healthcheck:
-      test: ["CMD-SHELL", "SQLCMDPASSWORD=$$MSSQL_SA_PASSWORD /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -Q 'SELECT 1' -b -No"]
-      interval: 10s
-      timeout: 10s
-      retries: 15
-      start_period: 30s
-
   db-init:
-    image: mcr.microsoft.com/mssql-tools
+    image: alpine:3.20
     container_name: parqueRM-db-init
-    depends_on:
-      sqlserver:
-        condition: service_healthy
     volumes:
-      - ./db/init:/scripts
+      - sqlite_data:/data
+      - ./db/init:/init:ro
+      - ./db/migrations:/migrations:ro
     environment:
-      SQLSERVER_SA_PASSWORD: "${SQLSERVER_SA_PASSWORD}"
-      SYSTEM_LAN_URL: "${SYSTEM_LAN_URL:-http://192.168.1.10}"
+      SYSTEM_LAN_URL: "${SYSTEM_LAN_URL:-http://parque.rm.local}"
     command: >
-      /bin/bash -c "
+      /bin/sh -c "
+      set -e &&
+      apk add --no-cache sqlite &&
+      echo 'SQLite listo - ejecutando scripts de inicializacion...' &&
+      sqlite3 /data/parquerm.db < /migrations/001_create_schema_migrations.sql &&
+      sqlite3 /data/parquerm.db < /init/01_create_database.sql &&
+      sqlite3 /data/parquerm.db < /init/02_schema.sql &&
+      sqlite3 /data/parquerm.db < /init/03_seed_security.sql &&
+      sqlite3 /data/parquerm.db < /init/03a_repair_utf8_seed_text.sql &&
+      sqlite3 /data/parquerm.db < /init/04_seed_catalogs.sql &&
+      sqlite3 /data/parquerm.db < /init/05_seed_tariffs.sql &&
+      sqlite3 /data/parquerm.db < /init/06_seed_park_config.sql &&
+      sqlite3 /data/parquerm.db < /init/07_seed_demo_data.sql &&
+      sqlite3 /data/parquerm.db < /init/08_patch_park_config_sidebar_color_hex.sql &&
+      sqlite3 /data/parquerm.db < /init/09_patch_tickets_and_services.sql &&
       SYSTEM_LAN_URL_ESCAPED=$$(printf '%s' \"$$SYSTEM_LAN_URL\" | sed \"s/'/''/g\") &&
-      echo 'SQL Server listo - ejecutando scripts de inicializacion...' &&
-      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SQLSERVER_SA_PASSWORD\" -i /scripts/01_create_database.sql &&
-      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SQLSERVER_SA_PASSWORD\" -d ParqueRM -i /scripts/02_schema.sql &&
-      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SQLSERVER_SA_PASSWORD\" -d ParqueRM -i /scripts/03_seed_security.sql &&
-      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SQLSERVER_SA_PASSWORD\" -d ParqueRM -i /scripts/04_seed_catalogs.sql &&
-      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SQLSERVER_SA_PASSWORD\" -d ParqueRM -i /scripts/05_seed_tariffs.sql &&
-      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SQLSERVER_SA_PASSWORD\" -d ParqueRM -i /scripts/06_seed_park_config.sql &&
-      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SQLSERVER_SA_PASSWORD\" -d ParqueRM -i /scripts/07_seed_demo_data.sql &&
-      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SQLSERVER_SA_PASSWORD\" -d ParqueRM -i /scripts/08_patch_park_config_sidebar_color_hex.sql &&
-      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SQLSERVER_SA_PASSWORD\" -d ParqueRM -i /scripts/09_patch_tickets_and_services.sql &&
-      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P \"$$SQLSERVER_SA_PASSWORD\" -d ParqueRM -Q \"UPDATE dbo.park_config SET system_lan_url = N'$$SYSTEM_LAN_URL_ESCAPED', updated_at = SYSDATETIME();\" &&
-      echo 'Base de datos inicializada correctamente.'
+      sqlite3 /data/parquerm.db \"UPDATE park_config SET system_lan_url = '$$SYSTEM_LAN_URL_ESCAPED', updated_at = CURRENT_TIMESTAMP;\" &&
+      echo 'Base SQLite inicializada correctamente.'
       "
     networks:
       - parqueRM-net
@@ -61,11 +41,10 @@ services:
       NODE_ENV: production
       PORT: 3000
 
-      DB_HOST: sqlserver
-      DB_PORT: 1433
-      DB_USER: sa
-      DB_PASSWORD: "${SQLSERVER_SA_PASSWORD}"
-      DB_NAME: ParqueRM
+      # IMPORTANT: tu backend debe soportar estas variables.
+      # En TypeORM usualmente sería type: 'sqlite' y database: DB_PATH.
+      DB_TYPE: sqlite
+      DB_PATH: /app/data/parquerm.db
 
       JWT_SECRET: "${JWT_SECRET}"
       JWT_REFRESH_SECRET: "${JWT_REFRESH_SECRET}"
@@ -74,12 +53,17 @@ services:
     ports:
       - "${BACKEND_PORT}:3000"
     volumes:
+      - sqlite_data:/app/data
       - uploads_data:/app/uploads
     depends_on:
-      sqlserver:
-        condition: service_healthy
       db-init:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     networks:
       - parqueRM-net
     restart: unless-stopped
@@ -100,7 +84,7 @@ services:
     restart: unless-stopped
 
 volumes:
-  sqlserver_data:
+  sqlite_data:
   uploads_data:
 
 networks:

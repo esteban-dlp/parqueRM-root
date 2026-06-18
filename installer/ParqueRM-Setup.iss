@@ -3,17 +3,17 @@
 ; Inno Setup 6 script -- ParqueRM production installer
 ;
 ; Defines passed from build-installer.ps1:
-;   /DAppVersion=1.0.3
+;   /DAppVersion=1.0.7
 ;   /DBuildNumber=202501011200
 ;   /DReleaseDir=C:\...\parqueRM-root\release
 ;
 ; Install modes:
-;   - Full (server)  : SQL Server + backend + frontend + services
-;   - Client-only    : creates browser shortcut only
+;   - Full (server)  : SQLite + backend + frontend + services
+;   - Client-only    : fallback that maps parquerm.local on Windows
 ; ============================================================
 
 #ifndef AppVersion
-  #define AppVersion "1.0.3"
+  #define AppVersion "1.0.7"
 #endif
 #ifndef BuildNumber
   #define BuildNumber "dev"
@@ -24,7 +24,7 @@
 
 #define AppName      "ParqueRM"
 #define AppPublisher "Parque Nacional"
-#define AppURL       "http://parque.rm.local"
+#define AppURL       "http://parquerm.local"
 #define DefaultDir   "C:\ParqueRM"
 #define DefaultAdminPassword "admin1"
 #define SetupExeName "ParqueRM-Setup-v" + AppVersion
@@ -58,11 +58,11 @@ Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 
 [Types]
 Name: "server";     Description: "Instalacion completa (servidor)"
-Name: "clientonly"; Description: "Solo cliente (acceso desde navegador)"
+Name: "clientonly"; Description: "Solo cliente (respaldo para parquerm.local)"
 
 [Components]
 Name: "server";     Description: "Servidor completo (Backend + Frontend + Base de datos)"; Types: server; Flags: fixed
-Name: "clientonly"; Description: "Acceso de cliente (solo acceso LAN)";                   Types: clientonly; Flags: fixed
+Name: "clientonly"; Description: "Acceso de cliente con descubrimiento automatico en LAN"; Types: clientonly; Flags: fixed
 
 [Tasks]
 Name: "desktopicon"; Description: "Crear acceso directo en el escritorio"; GroupDescription: "Opciones adicionales"
@@ -89,7 +89,19 @@ Source: "{#ReleaseDir}\app\config\*"; DestDir: "{app}\app\config"; \
 Source: "{#ReleaseDir}\app\tools\*"; DestDir: "{app}\tools"; \
   Flags: recursesubdirs ignoreversion createallsubdirs; Components: server
 
-; Runtime binaries (SQL Server Express, Node.js, Caddy, WinSW)
+; Client-only discovery and local URL maintenance scripts
+Source: "{#ReleaseDir}\app\tools\installer-scripts\configure-local-name.ps1"; \
+  DestDir: "{app}\tools\installer-scripts"; Flags: ignoreversion; Components: clientonly
+Source: "{#ReleaseDir}\app\tools\installer-scripts\discover-parquerm-server.ps1"; \
+  DestDir: "{app}\tools\installer-scripts"; Flags: ignoreversion; Components: clientonly
+Source: "{#ReleaseDir}\app\tools\installer-scripts\refresh-client-local-name.ps1"; \
+  DestDir: "{app}\tools\installer-scripts"; Flags: ignoreversion; Components: clientonly
+Source: "{#ReleaseDir}\app\tools\installer-scripts\register-client-name-task.ps1"; \
+  DestDir: "{app}\tools\installer-scripts"; Flags: ignoreversion; Components: clientonly
+Source: "{#ReleaseDir}\app\tools\installer-scripts\remove-client-local-name.ps1"; \
+  DestDir: "{app}\tools\installer-scripts"; Flags: ignoreversion; Components: clientonly
+
+; Runtime binaries (SQLite, Node.js, Caddy, WinSW)
 Source: "{#ReleaseDir}\runtime\*"; DestDir: "{app}\runtime"; \
   Flags: recursesubdirs ignoreversion createallsubdirs; Components: server
 
@@ -106,6 +118,8 @@ Name: "{app}\backups";       Components: server
 Name: "{app}\config";        Components: server
 Name: "{app}\services";      Components: server
 Name: "{app}\data\uploads\logos"; Components: server
+Name: "{app}\logs\network"; Components: clientonly
+Name: "{app}\config"; Components: clientonly
 
 [Icons]
 ; --- Server shortcuts -----------------------------------------------------------
@@ -132,17 +146,23 @@ Name: "{userdesktop}\ParqueRM";          Filename: "{app}\open-parquerm-client.u
 Filename: "powershell.exe"; \
   Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\tools\installer-scripts\uninstall-services.ps1"" \
     -InstallDir ""{app}"""; \
-  Flags: runhidden waituntilterminated
+  Flags: runhidden waituntilterminated; Components: server
 
 ; Remove firewall rules
 Filename: "powershell.exe"; \
   Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\tools\installer-scripts\configure-firewall.ps1"" -Remove"; \
-  Flags: runhidden waituntilterminated
+  Flags: runhidden waituntilterminated; Components: server
 
 ; Remove startup task
 Filename: "powershell.exe"; \
   Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""Unregister-ScheduledTask -TaskName 'ParqueRM_IpCheck' -Confirm:$false -ErrorAction SilentlyContinue"""; \
-  Flags: runhidden waituntilterminated
+  Flags: runhidden waituntilterminated; Components: server
+
+; Remove client task and hosts mapping
+Filename: "powershell.exe"; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\tools\installer-scripts\remove-client-local-name.ps1"" \
+    -InstallDir ""{app}"""; \
+  Flags: runhidden waituntilterminated; Components: clientonly
 
 [UninstallDelete]
 ; Remove log files on uninstall (backups are NOT deleted -- they are in {app}\backups)
@@ -156,12 +176,10 @@ Type: filesandordirs; Name: "{app}\services"
 
 var
   ServerIpPage:       TInputQueryWizardPage;
-  DbPasswordPage:     TInputQueryWizardPage;
   AdminInfoPage:      TOutputMsgWizardPage;
   JwtPage:            TInputQueryWizardPage;
   ClientServerIpPage: TInputQueryWizardPage;
   GServerIp:          String;
-  GDbPassword:        String;
   GAdminPassword:     String;
   GJwtSecret:         String;
   GJwtRefreshSecret:  String;
@@ -223,29 +241,21 @@ begin
   { Server IP page -- shown only in server mode }
   ServerIpPage := CreateInputQueryPage(wpSelectComponents,
     'URL local de ParqueRM',
-    'ParqueRM usara una URL local estable.',
-    'La URL recomendada sera http://parque.rm.local. La IP solo se conserva como fallback de diagnostico.');
+    'ParqueRM usara una URL local para la red.',
+    'La URL principal sera http://parquerm.local. Si otra PC no abre esa URL, use http://<IP-del-servidor> o instale el Modo Solo Cliente.');
   ServerIpPage.Add('IP del servidor:', False);
   ServerIpPage.Values[0] := GServerIp;
 
   { Client-only server IP page -- shown only in client-only mode }
   ClientServerIpPage := CreateInputQueryPage(wpSelectComponents,
     'URL del servidor ParqueRM',
-    'ParqueRM usara la URL local estable.',
-    'El acceso recomendado es http://parque.rm.local.');
-  ClientServerIpPage.Add('URL del servidor ParqueRM:', False);
+    'ParqueRM detectara el servidor automaticamente.',
+    'Puede dejar la IP vacia para descubrir el servidor por la red. Si conoce la IP actual, ingresela como ayuda inicial.');
+  ClientServerIpPage.Add('IP actual del servidor (opcional):', False);
   ClientServerIpPage.Values[0] := '';
 
-  { DB password page }
-  DbPasswordPage := CreateInputQueryPage(ServerIpPage.ID,
-    'Contrasena de base de datos',
-    'Ingrese la contrasena para SQL Server.',
-    'Si SQL Server ya existe, ingrese la contrasena actual de "sa". Si no existe, esta sera la contrasena que se intentara configurar.');
-  DbPasswordPage.Add('Contrasena:', True);
-  DbPasswordPage.Add('Confirmar contrasena:', True);
-
   { Admin credentials info page }
-  AdminInfoPage := CreateOutputMsgPage(DbPasswordPage.ID,
+  AdminInfoPage := CreateOutputMsgPage(ServerIpPage.ID,
     'Usuario admin inicial',
     'Credenciales iniciales de ParqueRM',
     'Usuario: admin' + #13#10 +
@@ -269,10 +279,9 @@ var
 begin
   isServer := WizardIsComponentSelected('server');
   if (PageID = ServerIpPage.ID) then Result := True
-  else if (PageID = DbPasswordPage.ID) and (not isServer) then Result := True
   else if (PageID = AdminInfoPage.ID) and (not isServer) then Result := True
   else if (PageID = JwtPage.ID) and ((not isServer) or GExistingInstall) then Result := True
-  else if (PageID = ClientServerIpPage.ID) then Result := True
+  else if (PageID = ClientServerIpPage.ID) then Result := isServer
   else Result := False;
 end;
 
@@ -309,23 +318,12 @@ begin
   end;
 
   if CurPageID = ClientServerIpPage.ID then begin
-    if not IsValidIPv4(Trim(ClientServerIpPage.Values[0])) then begin
-      MsgBox('Use el acceso recomendado: http://parque.rm.local', mbError, MB_OK);
+    if (Trim(ClientServerIpPage.Values[0]) <> '') and
+       (not IsValidIPv4(Trim(ClientServerIpPage.Values[0]))) then begin
+      MsgBox('Ingrese una IPv4 valida o deje el campo vacio para detectar el servidor automaticamente.', mbError, MB_OK);
       Result := False; Exit;
     end;
     GServerIp := Trim(ClientServerIpPage.Values[0]);
-  end;
-
-  if CurPageID = DbPasswordPage.ID then begin
-    if DbPasswordPage.Values[0] = '' then begin
-      MsgBox('La contrasena no puede estar vacia.', mbError, MB_OK);
-      Result := False; Exit;
-    end;
-    if DbPasswordPage.Values[0] <> DbPasswordPage.Values[1] then begin
-      MsgBox('Las contrasenas no coinciden.', mbError, MB_OK);
-      Result := False; Exit;
-    end;
-    GDbPassword := DbPasswordPage.Values[0];
   end;
 
   if CurPageID = JwtPage.ID then begin
@@ -365,16 +363,6 @@ begin
   Result := GServerIp;
 end;
 
-function GetDbPassword(Param: String): String;
-begin
-  Result := GDbPassword;
-end;
-
-function GetDbPasswordPs(Param: String): String;
-begin
-  Result := PowerShellSingleQuoted(GDbPassword);
-end;
-
 function GetJwtSecret(Param: String): String;
 begin
   Result := GJwtSecret;
@@ -393,13 +381,6 @@ end;
 function GetJwtRefreshSecretPs(Param: String): String;
 begin
   Result := PowerShellSingleQuoted(GJwtRefreshSecret);
-end;
-
-function SkipSqlInstall(Param: String): String;
-begin
-  { Always attempt SQL Server install unless already present.
-    initialize-db.ps1 checks if SQL Server is already installed. }
-  Result := 'false';
 end;
 
 procedure OpenDiagnosticsFolder(appDir: String);
@@ -430,7 +411,7 @@ var
   ps: String;
 begin
   ps :=
-      '$services=''ParqueRMBackend'',''ParqueRMFrontend'',''ParqueRMLocalName'';' +
+      '$services=''ParqueRMBackend'',''ParqueRMFrontend'',''ParqueRMDns'',''ParqueRMLocalName'';' +
     'foreach($svcName in $services){' +
     '  $svc=Get-Service $svcName -ErrorAction SilentlyContinue;' +
     '  if($svc -and $svc.Status -ne ''Running''){' +
@@ -454,10 +435,6 @@ begin
   if ExitCode = -1 then
     msg := 'No se pudo ejecutar el paso: ' + StepName + #13#10 +
       'Revise permisos de administrador y archivos de instalacion.'
-  else if ExitCode = 12 then
-    msg := 'SQL Server necesita reiniciar Windows antes de continuar.' + #13#10 +
-      'El instalador aplico una correccion/actualizacion necesaria para SQL Server.' + #13#10#13#10 +
-      'Reinicie la computadora y ejecute nuevamente el instalador de ParqueRM.'
   else
     msg := 'La instalacion de ParqueRM no pudo completar el paso:' + #13#10 +
       StepName + #13#10#13#10 +
@@ -468,105 +445,6 @@ begin
     ExpandConstant('{app}\diagnostics'), mbError, MB_OK);
 
   WizardForm.Close;
-end;
-
-function PromptSqlPasswordRetry(var NewPassword: String): Boolean;
-var
-  form: TSetupForm;
-  infoLabel: TNewStaticText;
-  passwordLabel: TNewStaticText;
-  confirmLabel: TNewStaticText;
-  passwordEdit: TPasswordEdit;
-  confirmEdit: TPasswordEdit;
-  okButton: TNewButton;
-  cancelButton: TNewButton;
-begin
-  Result := False;
-
-  while True do begin
-    form := CreateCustomForm(ScaleX(430), ScaleY(220), False, True);
-    try
-      form.Caption := 'Contrasena SQL Server';
-
-      infoLabel := TNewStaticText.Create(form);
-      infoLabel.Parent := form;
-      infoLabel.Left := ScaleX(12);
-      infoLabel.Top := ScaleY(12);
-      infoLabel.Width := ScaleX(405);
-      infoLabel.Height := ScaleY(55);
-      infoLabel.WordWrap := True;
-      infoLabel.Caption :=
-        'La contrasena SQL ingresada no funciono o SQL Server la rechazo. ' +
-        'Ingrese la contrasena actual del usuario "sa" si SQL Server ya existe, ' +
-        'o una nueva contrasena para instalar SQL Server.';
-
-      passwordLabel := TNewStaticText.Create(form);
-      passwordLabel.Parent := form;
-      passwordLabel.Left := ScaleX(12);
-      passwordLabel.Top := ScaleY(82);
-      passwordLabel.Caption := 'Contrasena de sa:';
-
-      passwordEdit := TPasswordEdit.Create(form);
-      passwordEdit.Parent := form;
-      passwordEdit.Left := ScaleX(12);
-      passwordEdit.Top := ScaleY(100);
-      passwordEdit.Width := ScaleX(405);
-
-      confirmLabel := TNewStaticText.Create(form);
-      confirmLabel.Parent := form;
-      confirmLabel.Left := ScaleX(12);
-      confirmLabel.Top := ScaleY(132);
-      confirmLabel.Caption := 'Confirmar contrasena:';
-
-      confirmEdit := TPasswordEdit.Create(form);
-      confirmEdit.Parent := form;
-      confirmEdit.Left := ScaleX(12);
-      confirmEdit.Top := ScaleY(150);
-      confirmEdit.Width := ScaleX(405);
-
-      okButton := TNewButton.Create(form);
-      okButton.Parent := form;
-      okButton.Caption := 'Reintentar';
-      okButton.Left := ScaleX(217);
-      okButton.Top := ScaleY(188);
-      okButton.Width := ScaleX(95);
-      okButton.ModalResult := mrOk;
-      okButton.Default := True;
-
-      cancelButton := TNewButton.Create(form);
-      cancelButton.Parent := form;
-      cancelButton.Caption := 'Cancelar';
-      cancelButton.Left := ScaleX(322);
-      cancelButton.Top := ScaleY(188);
-      cancelButton.Width := ScaleX(95);
-      cancelButton.ModalResult := mrCancel;
-      cancelButton.Cancel := True;
-
-      form.ActiveControl := passwordEdit;
-      form.FlipAndCenterIfNeeded(True, WizardForm, False);
-
-      if form.ShowModal() <> mrOk then begin
-        Result := False;
-        Exit;
-      end;
-
-      if passwordEdit.Text = '' then begin
-        MsgBox('La contrasena SQL no puede estar vacia.', mbError, MB_OK);
-        Continue;
-      end;
-
-      if passwordEdit.Text <> confirmEdit.Text then begin
-        MsgBox('Las contrasenas SQL no coinciden.', mbError, MB_OK);
-        Continue;
-      end;
-
-      NewPassword := passwordEdit.Text;
-      Result := True;
-      Exit;
-    finally
-      form.Free();
-    end;
-  end;
 end;
 
 function RunPowerShellStepRaw(StepName, ScriptPath, Args: String; ShowWindow: Boolean): Integer;
@@ -609,17 +487,13 @@ begin
   Result :=
     '-InstallDir "' + appDir + '" ' +
     '-RuntimeCacheDir "' + appDir + '\runtime" ' +
-    '-DbPassword ' + PowerShellSingleQuoted(GDbPassword) + ' ' +
     '-AdminPasswordEnv "PARQUERM_INSTALLER_ADMIN_PASSWORD" ' +
     '-InitScriptsDir "' + appDir + '\app\database\init" ' +
     '-MigrationsDir "' + appDir + '\app\database\migrations" ' +
-    '-SkipSqlServerInstall:' + SkipSqlInstall('');
+    '-DbPath "' + appDir + '\data\parquerm.db"';
 end;
 
-procedure RunInitializeDbWithRetry(appDir, scriptsDir: String);
-var
-  rc: Integer;
-  retryPassword: String;
+procedure RunInitializeDb(appDir, scriptsDir: String);
 begin
   if not SetEnvironmentVariable('PARQUERM_INSTALLER_ADMIN_PASSWORD', GAdminPassword) then begin
     FailInstall('Preparando usuario admin inicial...', -1);
@@ -627,29 +501,11 @@ begin
   end;
 
   try
-    while True do begin
-      rc := RunPowerShellStepRaw(
-        'Inicializando base de datos...',
-        scriptsDir + '\initialize-db.ps1',
-        InitializeDbArgs(appDir),
-        False);
-
-      if rc = 0 then
-        Exit;
-
-      if rc = 11 then begin
-        if PromptSqlPasswordRetry(retryPassword) then begin
-          GDbPassword := retryPassword;
-          Continue;
-        end;
-
-        FailInstall('Inicializando base de datos...', 11);
-        Exit;
-      end;
-
-      FailInstall('Inicializando base de datos...', rc);
-      Exit;
-    end;
+    RunPowerShellStep(
+      'Inicializando base de datos...',
+      scriptsDir + '\initialize-db.ps1',
+      InitializeDbArgs(appDir),
+      False);
   finally
     SetEnvironmentVariable('PARQUERM_INSTALLER_ADMIN_PASSWORD', '');
   end;
@@ -677,7 +533,7 @@ begin
     False);
   if GInstallFailed then Exit;
 
-  RunInitializeDbWithRetry(appDir, scriptsDir);
+  RunInitializeDb(appDir, scriptsDir);
   if GInstallFailed then Exit;
 
   RunPowerShellStep(
@@ -685,7 +541,7 @@ begin
     scriptsDir + '\generate-config.ps1',
     '-InstallDir "' + appDir + '" ' +
     '-ServerIp "' + GServerIp + '" ' +
-    '-DbPassword ' + PowerShellSingleQuoted(GDbPassword) + ' ' +
+    '-DbPath "' + appDir + '\data\parquerm.db" ' +
     '-JwtSecret ' + PowerShellSingleQuoted(GJwtSecret) + ' ' +
     '-JwtRefreshSecret ' + PowerShellSingleQuoted(GJwtRefreshSecret) + ' ' +
     '-PreserveExistingSecrets',
@@ -696,6 +552,13 @@ begin
     'Instalando servicios de Windows...',
     scriptsDir + '\install-services.ps1',
     '-InstallDir "' + appDir + '" -RuntimeDir "' + appDir + '\runtime"',
+    False);
+  if GInstallFailed then Exit;
+
+  RunPowerShellStep(
+    'Verificando URL local...',
+    scriptsDir + '\configure-local-name.ps1',
+    '-InstallDir "' + appDir + '"',
     False);
   if GInstallFailed then Exit;
 
@@ -722,7 +585,7 @@ begin
   if WizardIsComponentSelected('server') then begin
     ps :=
       '$install=''' + ExpandConstant('{app}') + ''';' +
-      '$services=''ParqueRMFrontend'',''ParqueRMBackend'',''ParqueRMLocalName'';' +
+      '$services=''ParqueRMFrontend'',''ParqueRMBackend'',''ParqueRMDns'',''ParqueRMLocalName'';' +
       'foreach($svcName in $services){' +
       '  $svc=Get-Service $svcName -ErrorAction SilentlyContinue;' +
       '  if($svc -and $svc.Status -ne ''Stopped''){' +
@@ -736,9 +599,10 @@ begin
       '  Start-Sleep -Milliseconds 500' +
       '} while((Get-Date) -lt $deadline);' +
       'Unregister-ScheduledTask -TaskName ''ParqueRM_IpCheck'' -Confirm:$false -ErrorAction SilentlyContinue;' +
+      'Unregister-ScheduledTask -TaskName ''ParqueRM_ClientNameRefresh'' -Confirm:$false -ErrorAction SilentlyContinue;' +
       '$prefix=([IO.Path]::GetFullPath($install)).TrimEnd(''\'') + ''\'';' +
       '$procs=Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {' +
-      '  ($_.Name -in @(''node.exe'',''caddy.exe'',''powershell.exe'',''ParqueRMBackend.exe'',''ParqueRMFrontend.exe'',''ParqueRMLocalName.exe'',''WinSW.exe'',''WinSW-x64.exe'')) -and' +
+      '  ($_.Name -in @(''node.exe'',''caddy.exe'',''coredns.exe'',''powershell.exe'',''ParqueRMBackend.exe'',''ParqueRMFrontend.exe'',''ParqueRMDns.exe'',''ParqueRMLocalName.exe'',''WinSW.exe'',''WinSW-x64.exe'')) -and' +
       '  (($_.ExecutablePath -and [IO.Path]::GetFullPath($_.ExecutablePath).StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)) -or' +
       '   ($_.CommandLine -and $_.CommandLine.IndexOf($prefix,[StringComparison]::OrdinalIgnoreCase) -ge 0))' +
       '};' +
@@ -748,7 +612,37 @@ begin
     Exec('powershell.exe',
       '-NoProfile -ExecutionPolicy Bypass -Command "' + ps + '"',
       '', SW_HIDE, ewWaitUntilTerminated, rc);
+  end else if WizardIsComponentSelected('clientonly') then begin
+    Exec('powershell.exe',
+      '-NoProfile -ExecutionPolicy Bypass -Command "Unregister-ScheduledTask -TaskName ''ParqueRM_ClientNameRefresh'' -Confirm:$false -ErrorAction SilentlyContinue"',
+      '', SW_HIDE, ewWaitUntilTerminated, rc);
   end;
+end;
+
+procedure RunClientPostInstall;
+var
+  appDir: String;
+  scriptsDir: String;
+  refreshArgs: String;
+begin
+  appDir := ExpandConstant('{app}');
+  scriptsDir := appDir + '\tools\installer-scripts';
+  refreshArgs := '-InstallDir "' + appDir + '"';
+  if Trim(GServerIp) <> '' then
+    refreshArgs := refreshArgs + ' -PreferredServerIp "' + GServerIp + '"';
+
+  RunPowerShellStep(
+    'Detectando servidor ParqueRM...',
+    scriptsDir + '\refresh-client-local-name.ps1',
+    refreshArgs,
+    False);
+  if GInstallFailed then Exit;
+
+  RunPowerShellStep(
+    'Activando URL local automatica...',
+    scriptsDir + '\register-client-name-task.ps1',
+    '-InstallDir "' + appDir + '"',
+    False);
 end;
 
 { ===== Client-only: write URL shortcut file ===== }
@@ -756,6 +650,7 @@ procedure CurStepChanged(CurStep: TSetupStep);
 var
   urlFile:    String;
   urlContent: String;
+  rc:         Integer;
 begin
   if CurStep = ssPostInstall then begin
     if WizardIsComponentSelected('server') then begin
@@ -763,9 +658,12 @@ begin
     end;
 
     if WizardIsComponentSelected('clientonly') then begin
+      RunClientPostInstall;
+      if GInstallFailed then Exit;
+
       urlFile    := ExpandConstant('{app}\open-parquerm-client.url');
       urlContent := '[InternetShortcut]' + #13#10 +
-                    'URL=http://parque.rm.local' + #13#10 +
+                    'URL=http://parquerm.local' + #13#10 +
                     'IconIndex=0' + #13#10;
       SaveStringToFile(urlFile, urlContent, False);
     end;

@@ -1,17 +1,18 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Lightweight mDNS responder for ParqueRM stable local names.
+    Local name and LAN discovery responder for ParqueRM.
 
 .DESCRIPTION
-    Answers A-record mDNS queries for parque.rm.local and parquerm.local with
-    the current non-virtual IPv4 addresses. This gives LAN clients a chance to
-    use the stable URL when their OS/network supports multicast DNS.
+    Answers mDNS A-record queries for parquerm.local and parque.rm.local, sends
+    periodic mDNS announcements, and responds to ParqueRM UDP discovery packets
+    on port 47880 with the current LAN IPs and instance identity.
 #>
 param(
     [string]$InstallDir = 'C:\ParqueRM',
-    [string[]]$HostNames = @('parque.rm.local', 'parquerm.local'),
-    [int]$Port = 5353,
+    [string[]]$HostNames = @('parquerm.local', 'parque.rm.local'),
+    [int]$MdnsPort = 5353,
+    [int]$DiscoveryPort = 47880,
     [int]$TtlSeconds = 120
 )
 
@@ -21,18 +22,77 @@ $ErrorActionPreference = 'Stop'
 $logDir = Join-Path $InstallDir 'logs\network'
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
 $logFile = Join-Path $logDir 'local-name-responder.log'
+$configPath = Join-Path $InstallDir 'config\parquerm.config.json'
+$backendEnvPath = Join-Path $InstallDir 'app\backend\.env'
+$versionPath = Join-Path $InstallDir 'version.json'
 $multicastAddress = [System.Net.IPAddress]::Parse('224.0.0.251')
-$multicastEndpoint = New-Object System.Net.IPEndPoint -ArgumentList $multicastAddress, $Port
+$multicastEndpoint = New-Object System.Net.IPEndPoint -ArgumentList $multicastAddress, $MdnsPort
 $knownNames = @($HostNames |
     Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
     ForEach-Object { $_.Trim().TrimEnd('.').ToLowerInvariant() } |
     Select-Object -Unique)
 $lastIpLog = ''
+$lastAnnouncementKey = ''
+$lastAnnouncementAt = [DateTime]::MinValue
 
 function Write-Log([string]$Message, [string]$Level = 'INFO') {
     $line = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [$Level] $Message"
     Add-Content -Path $logFile -Value $line -Encoding utf8
     Write-Host $line
+}
+
+function Read-DotEnvValue([string]$Path, [string]$Key) {
+    if (-not (Test-Path $Path)) { return '' }
+    $line = Get-Content $Path | Where-Object { $_ -match "^$([regex]::Escape($Key))=" } | Select-Object -First 1
+    if (-not $line) { return '' }
+    $value = ($line -split '=', 2)[1]
+    if ($value.Length -ge 2) {
+        $first = $value.Substring(0, 1)
+        $last = $value.Substring($value.Length - 1, 1)
+        if (($first -eq '"' -and $last -eq '"') -or ($first -eq "'" -and $last -eq "'")) {
+            $value = $value.Substring(1, $value.Length - 2)
+        }
+    }
+    return $value
+}
+
+function Get-ParqueRmMetadata {
+    $version = ''
+    $instanceId = ''
+
+    if (Test-Path $configPath) {
+        try {
+            $config = Get-Content $configPath -Raw | ConvertFrom-Json
+            if ($config.version) { $version = [string]$config.version }
+            if ($config.instanceId) { $instanceId = [string]$config.instanceId }
+        } catch {
+            Write-Log "Could not read central config metadata: $($_.Exception.Message)" 'WARN'
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($version) -and (Test-Path $versionPath)) {
+        try {
+            $versionInfo = Get-Content $versionPath -Raw | ConvertFrom-Json
+            if ($versionInfo.version) { $version = [string]$versionInfo.version }
+        } catch {
+            Write-Log "Could not read version metadata: $($_.Exception.Message)" 'WARN'
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($instanceId)) {
+        $instanceId = Read-DotEnvValue $backendEnvPath 'PARQUERM_INSTANCE_ID'
+    }
+    if ([string]::IsNullOrWhiteSpace($version)) {
+        $version = Read-DotEnvValue $backendEnvPath 'PARQUERM_VERSION'
+    }
+
+    if ([string]::IsNullOrWhiteSpace($version)) { $version = 'unknown' }
+    if ([string]::IsNullOrWhiteSpace($instanceId)) { $instanceId = 'unknown' }
+
+    return [PSCustomObject]@{
+        Version = $version
+        InstanceId = $instanceId
+    }
 }
 
 function Test-IsVirtualAdapterName([string]$AdapterName) {
@@ -42,6 +102,16 @@ function Test-IsVirtualAdapterName([string]$AdapterName) {
         'VMware',
         'VirtualBox',
         'Hyper-V',
+        'Docker',
+        'VPN',
+        'TAP',
+        'Tailscale',
+        'WireGuard',
+        'OpenVPN',
+        'ZeroTier',
+        'AnyConnect',
+        'Nord',
+        'Radmin',
         'WSL',
         'Loopback',
         'Pseudo',
@@ -58,33 +128,59 @@ function Test-IsVirtualAdapterName([string]$AdapterName) {
     return $false
 }
 
-function Get-CurrentIpv4Addresses {
+function Get-CurrentIpv4AddressInfo {
     $addresses = @()
     $candidates = @(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
         Where-Object {
             $_.IPAddress -notmatch '^127\.' -and
-            $_.IPAddress -notmatch '^169\.254\.' -and
+            $_.AddressState -ne 'Duplicate' -and
             $_.PrefixOrigin -ne 'WellKnown' -and
             $_.SuffixOrigin -ne 'Random'
         })
 
     foreach ($addr in $candidates) {
         $adapter = Get-NetAdapter -InterfaceIndex $addr.InterfaceIndex -ErrorAction SilentlyContinue
-        if (-not $adapter) { continue }
-        if ($adapter.Status -ne 'Up') { continue }
+        if (-not $adapter -or $adapter.Status -ne 'Up') { continue }
         if (Test-IsVirtualAdapterName $adapter.Name) { continue }
         if (Test-IsVirtualAdapterName $adapter.InterfaceDescription) { continue }
 
+        $metric = 0
+        $ipInterface = Get-NetIPInterface -InterfaceIndex $addr.InterfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue
+        if ($null -ne $ipInterface) { $metric = $ipInterface.InterfaceMetric }
+
         $addresses += [PSCustomObject]@{
             IP          = $addr.IPAddress
+            PrefixLength = [int]$addr.PrefixLength
+            Adapter     = $adapter.Name
             Description = $adapter.InterfaceDescription
-            Metric      = $addr.InterfaceMetric
+            Metric      = $metric
+            IsApipa     = ($addr.IPAddress -match '^169\.254\.')
+            IsWifi      = ($adapter.InterfaceDescription -match 'Wi-Fi|Wireless|802\.11|WLAN' -or $adapter.Name -match 'Wi-Fi|Wireless|802\.11|WLAN')
         }
     }
 
+    $nonApipa = @($addresses | Where-Object { -not $_.IsApipa })
+    if ($nonApipa.Count -gt 0) { $addresses = $nonApipa }
+
     return @($addresses |
-        Sort-Object @{ Expression = { if ($_.Description -match 'Wi-Fi|Wireless|802\.11|WLAN') { 1 } else { 0 } } }, Metric, IP |
-        Select-Object -ExpandProperty IP -Unique)
+        Sort-Object IsApipa, @{ Expression = { if ($_.IsWifi) { 1 } else { 0 } } }, Metric, IP |
+        Select-Object -Property IP, PrefixLength, Adapter, Description, Metric -Unique)
+}
+
+function Get-CurrentIpv4Addresses {
+    return @(Get-CurrentIpv4AddressInfo | Select-Object -ExpandProperty IP -Unique)
+}
+
+function Write-IpChangeLog([string[]]$CurrentIps) {
+    $ipKey = ($CurrentIps -join ',')
+    if ($script:lastIpLog -eq $ipKey) { return }
+
+    if ($CurrentIps.Count -gt 0) {
+        Write-Log "Current IPv4 addresses: $($CurrentIps -join ', ')"
+    } else {
+        Write-Log 'No useful LAN IPv4 address currently available.' 'WARN'
+    }
+    $script:lastIpLog = $ipKey
 }
 
 function Get-UInt16([byte[]]$Bytes, [int]$Offset) {
@@ -168,6 +264,32 @@ function New-AnswerBytes([string]$Name, [string]$IpAddress) {
     return $list.ToArray()
 }
 
+function New-MdnsResponseForNames([byte[]]$Packet, [string[]]$Names, [string[]]$CurrentIps) {
+    if ($CurrentIps.Count -eq 0 -or $Names.Count -eq 0) { return $null }
+
+    $answerCount = $Names.Count * $CurrentIps.Count
+    $response = New-Object 'System.Collections.Generic.List[byte]'
+    if ($null -ne $Packet -and $Packet.Length -ge 2) {
+        Add-Byte $response $Packet[0]
+        Add-Byte $response $Packet[1]
+    } else {
+        Add-UInt16 $response 0
+    }
+    Add-UInt16 $response 0x8400
+    Add-UInt16 $response 0
+    Add-UInt16 $response $answerCount
+    Add-UInt16 $response 0
+    Add-UInt16 $response 0
+
+    foreach ($name in $Names) {
+        foreach ($ip in $CurrentIps) {
+            Add-Bytes $response (New-AnswerBytes $name $ip)
+        }
+    }
+
+    return $response.ToArray()
+}
+
 function New-MdnsResponse([byte[]]$Packet) {
     if ($Packet.Length -lt 12) { return $null }
 
@@ -196,34 +318,14 @@ function New-MdnsResponse([byte[]]$Packet) {
     if ($matchedNames.Count -eq 0) { return $null }
 
     $currentIps = @(Get-CurrentIpv4Addresses)
-    $ipKey = ($currentIps -join ',')
-    if ($script:lastIpLog -ne $ipKey) {
-        if ($currentIps.Count -gt 0) {
-            Write-Log "Current IPv4 addresses: $($currentIps -join ', ')"
-        } else {
-            Write-Log 'No LAN IPv4 address currently available.' 'WARN'
-        }
-        $script:lastIpLog = $ipKey
-    }
-    if ($currentIps.Count -eq 0) { return $null }
+    Write-IpChangeLog $currentIps
+    return New-MdnsResponseForNames $Packet $matchedNames $currentIps
+}
 
-    $answerCount = $matchedNames.Count * $currentIps.Count
-    $response = New-Object 'System.Collections.Generic.List[byte]'
-    Add-Byte $response $Packet[0]
-    Add-Byte $response $Packet[1]
-    Add-UInt16 $response 0x8400
-    Add-UInt16 $response 0
-    Add-UInt16 $response $answerCount
-    Add-UInt16 $response 0
-    Add-UInt16 $response 0
-
-    foreach ($name in $matchedNames) {
-        foreach ($ip in $currentIps) {
-            Add-Bytes $response (New-AnswerBytes $name $ip)
-        }
-    }
-
-    return $response.ToArray()
+function New-MdnsAnnouncement {
+    $currentIps = @(Get-CurrentIpv4Addresses)
+    Write-IpChangeLog $currentIps
+    return New-MdnsResponseForNames $null $knownNames $currentIps
 }
 
 function New-MdnsClient {
@@ -233,34 +335,123 @@ function New-MdnsClient {
         [System.Net.Sockets.SocketOptionLevel]::Socket,
         [System.Net.Sockets.SocketOptionName]::ReuseAddress,
         $true)
-    $bindEndpoint = New-Object System.Net.IPEndPoint -ArgumentList ([System.Net.IPAddress]::Any), $Port
+    $bindEndpoint = New-Object System.Net.IPEndPoint -ArgumentList ([System.Net.IPAddress]::Any), $MdnsPort
     $udp.Client.Bind($bindEndpoint)
     $udp.JoinMulticastGroup($multicastAddress)
     return $udp
 }
 
-Write-Log "Starting ParqueRM mDNS responder for: $($knownNames -join ', ')"
+function New-DiscoveryClient {
+    $udp = New-Object System.Net.Sockets.UdpClient
+    $udp.ExclusiveAddressUse = $false
+    $udp.EnableBroadcast = $true
+    $udp.Client.SetSocketOption(
+        [System.Net.Sockets.SocketOptionLevel]::Socket,
+        [System.Net.Sockets.SocketOptionName]::ReuseAddress,
+        $true)
+    $bindEndpoint = New-Object System.Net.IPEndPoint -ArgumentList ([System.Net.IPAddress]::Any), $DiscoveryPort
+    $udp.Client.Bind($bindEndpoint)
+    return $udp
+}
+
+function Test-DiscoveryRequest([byte[]]$Packet) {
+    if ($Packet.Length -eq 0) { return $false }
+    $text = [System.Text.Encoding]::UTF8.GetString($Packet).Trim()
+    if ($text -eq 'PARQUERM_DISCOVER_V1') { return $true }
+    try {
+        $json = $text | ConvertFrom-Json
+        return ($json.app -eq 'ParqueRM' -and $json.type -eq 'discover')
+    } catch {
+        return $false
+    }
+}
+
+function New-DiscoveryResponseJson {
+    $metadata = Get-ParqueRmMetadata
+    $ips = @(Get-CurrentIpv4Addresses)
+    Write-IpChangeLog $ips
+    $primaryIp = if ($ips.Count -gt 0) { $ips[0] } else { '' }
+    $healthUrl = if ($primaryIp) { "http://$primaryIp/api/health" } else { 'http://parquerm.local/api/health' }
+    $urls = @($knownNames | ForEach-Object { "http://$_" })
+    foreach ($ip in $ips) { $urls += "http://$ip" }
+
+    return ([ordered]@{
+        app = 'ParqueRM'
+        status = 'ok'
+        version = $metadata.Version
+        instanceId = $metadata.InstanceId
+        hostnames = @($knownNames)
+        ips = @($ips)
+        port = 80
+        healthUrl = $healthUrl
+        urls = @($urls | Select-Object -Unique)
+        timestamp = (Get-Date).ToUniversalTime().ToString('o')
+    } | ConvertTo-Json -Depth 4 -Compress)
+}
+
+function Send-PeriodicAnnouncement([System.Net.Sockets.UdpClient]$MdnsClient) {
+    $currentIps = @(Get-CurrentIpv4Addresses)
+    $announcementKey = "$($knownNames -join ',')|$($currentIps -join ',')"
+    $ageSeconds = ([DateTime]::UtcNow - $script:lastAnnouncementAt).TotalSeconds
+    if ($announcementKey -eq $script:lastAnnouncementKey -and $ageSeconds -lt 60) { return }
+
+    $announcement = New-MdnsResponseForNames $null $knownNames $currentIps
+    if ($null -eq $announcement) { return }
+
+    [void]$MdnsClient.Send($announcement, $announcement.Length, $multicastEndpoint)
+    $script:lastAnnouncementKey = $announcementKey
+    $script:lastAnnouncementAt = [DateTime]::UtcNow
+    Write-Log "Announced mDNS names: $($knownNames -join ', ')"
+}
+
+if ($knownNames.Count -eq 0) {
+    Write-Log 'No hostnames configured for local-name responder.' 'ERROR'
+    exit 1
+}
+
+Write-Log "Starting ParqueRM local-name responder for: $($knownNames -join ', ')"
+Write-Log "mDNS UDP $MdnsPort, discovery UDP $DiscoveryPort"
 
 while ($true) {
-    $udpClient = $null
+    $mdnsClient = $null
+    $discoveryClient = $null
     try {
-        $udpClient = New-MdnsClient
-        Write-Log "Listening on UDP $Port multicast $multicastAddress"
+        $mdnsClient = New-MdnsClient
+        $discoveryClient = New-DiscoveryClient
+        Write-Log "Listening on UDP $MdnsPort multicast $multicastAddress and UDP $DiscoveryPort"
 
         while ($true) {
-            $remoteEndpoint = New-Object System.Net.IPEndPoint -ArgumentList ([System.Net.IPAddress]::Any), 0
-            $packet = $udpClient.Receive([ref]$remoteEndpoint)
-            $response = New-MdnsResponse $packet
-            if ($null -eq $response) { continue }
+            Send-PeriodicAnnouncement $mdnsClient
 
-            [void]$udpClient.Send($response, $response.Length, $multicastEndpoint)
-            if ($remoteEndpoint.Address -and $remoteEndpoint.Port -gt 0) {
-                [void]$udpClient.Send($response, $response.Length, $remoteEndpoint)
+            while ($mdnsClient.Available -gt 0) {
+                $remoteEndpoint = New-Object System.Net.IPEndPoint -ArgumentList ([System.Net.IPAddress]::Any), 0
+                $packet = $mdnsClient.Receive([ref]$remoteEndpoint)
+                $response = New-MdnsResponse $packet
+                if ($null -eq $response) { continue }
+
+                [void]$mdnsClient.Send($response, $response.Length, $multicastEndpoint)
+                if ($remoteEndpoint.Address -and $remoteEndpoint.Port -gt 0) {
+                    [void]$mdnsClient.Send($response, $response.Length, $remoteEndpoint)
+                }
             }
+
+            while ($discoveryClient.Available -gt 0) {
+                $remoteEndpoint = New-Object System.Net.IPEndPoint -ArgumentList ([System.Net.IPAddress]::Any), 0
+                $packet = $discoveryClient.Receive([ref]$remoteEndpoint)
+                if (-not (Test-DiscoveryRequest $packet)) { continue }
+
+                $json = New-DiscoveryResponseJson
+                $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+                [void]$discoveryClient.Send($bytes, $bytes.Length, $remoteEndpoint)
+                Write-Log "Discovery response sent to $($remoteEndpoint.Address):$($remoteEndpoint.Port)"
+            }
+
+            Start-Sleep -Milliseconds 50
         }
     } catch {
-        Write-Log "mDNS responder error: $($_.Exception.Message)" 'ERROR'
-        if ($udpClient) { $udpClient.Close() }
+        Write-Log "local-name responder error: $($_.Exception.Message)" 'ERROR'
+        if ($mdnsClient) { $mdnsClient.Close() }
+        if ($discoveryClient) { $discoveryClient.Close() }
         Start-Sleep -Seconds 30
     }
 }

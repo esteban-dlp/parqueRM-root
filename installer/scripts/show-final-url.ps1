@@ -50,9 +50,11 @@ Start-Sleep -Seconds 3
 Test-HttpUrl 'Frontend' $cfg.frontendUrl
 Test-HttpUrl 'Backend health' "$($cfg.backendUrl)/health"
 Test-HttpUrl 'Database health' "$($cfg.backendUrl)/health/database"
+Test-HttpUrl 'Frontend por localhost' 'http://127.0.0.1/'
+Test-HttpUrl 'API por localhost/Caddy' 'http://127.0.0.1/api/health'
 
 try {
-    $canonicalHost = if ($cfg.canonicalHost) { $cfg.canonicalHost } else { 'parque.rm.local' }
+    $canonicalHost = if ($cfg.canonicalHost) { $cfg.canonicalHost } else { 'parquerm.local' }
     $resolved = [System.Net.Dns]::GetHostAddresses($canonicalHost) |
         Where-Object { $_.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork } |
         ForEach-Object { $_.IPAddressToString }
@@ -97,9 +99,20 @@ Write-Host ""
 Write-Host "  Documentacion API:" -ForegroundColor Yellow
 Write-Host "    $($cfg.swaggerUrl)" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "  Cualquier computadora conectada a la misma red local" -ForegroundColor White
-Write-Host "  puede acceder desde:" -ForegroundColor White
+Write-Host "  URL publica para la red local:" -ForegroundColor White
 Write-Host ""
 Write-Host "    $($cfg.frontendUrl)" -ForegroundColor Green
+Write-Host ""
+Write-Host "  Fallback por IP del servidor:" -ForegroundColor White
+if ($cfg.currentIpv4Addresses) {
+    foreach ($ip in @($cfg.currentIpv4Addresses)) {
+        Write-Host "    http://$ip" -ForegroundColor Cyan
+    }
+} else {
+    Write-Host "    Revise 'Ver estado de ParqueRM' para ver la IP actual." -ForegroundColor Yellow
+}
+Write-Host ""
+Write-Host "  Si parquerm.local no abre desde otra PC, instale el Modo Solo Cliente" -ForegroundColor Yellow
+Write-Host "  en esa PC o use temporalmente el fallback por IP." -ForegroundColor Yellow
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor Cyan

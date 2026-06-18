@@ -162,10 +162,10 @@ if ($SkipRuntimeValidation) {
     Log '  [SKIP] -SkipRuntimeValidation passed' 'Yellow'
 } else {
     $required = @(
-        @{ Path = 'sqlserver-express'; Desc = 'SQL Server Express offline installer (SQLEXPR_x64_ENU.exe or similar)' },
         @{ Path = 'node';             Desc = 'Node.js Windows portable/installer (node.exe or node-vX.X.X-win-x64.zip)' },
         @{ Path = 'caddy';            Desc = 'Caddy Windows binary (caddy.exe)' },
-        @{ Path = 'winsw';            Desc = 'WinSW service wrapper (WinSW.exe or WinSW-x64.exe)' }
+        @{ Path = 'winsw';            Desc = 'WinSW service wrapper (WinSW.exe or WinSW-x64.exe)' },
+        @{ Path = 'sqlite';           Desc = 'SQLite command-line tools (sqlite3.exe)' }
     )
 
     $missing = @()
@@ -192,23 +192,25 @@ if ($SkipRuntimeValidation) {
         exit 1
     }
 
-    $sqlSetup = Get-ChildItem (Join-Path $RuntimeCache 'sqlserver-express') -Filter 'SQLEXPR*.exe' -File -ErrorAction SilentlyContinue |
-        Select-Object -First 1
-    if ($sqlSetup) {
-        $sqlVersion = $sqlSetup.VersionInfo.FileVersion
-        Log "  [INFO] SQL Server Express setup: $($sqlSetup.Name) ($sqlVersion)" 'Gray'
+    $sqliteExe = Join-Path $RuntimeCache 'sqlite\sqlite3.exe'
+    if (Test-Path $sqliteExe) {
+        $sqliteVersion = & $sqliteExe -version 2>&1 | Select-Object -First 1
+        if ($LASTEXITCODE -eq 0) {
+            Log "  [INFO] SQLite: $sqliteVersion" 'Gray'
+        } else {
+            Log '  [WARN] sqlite3.exe is present but did not report a version.' 'Yellow'
+        }
     }
-
-    $sqlUpdatesDir = Join-Path $RuntimeCache 'sqlserver-express\updates'
-    $sqlUpdates = @()
-    if (Test-Path $sqlUpdatesDir) {
-        $sqlUpdates = @(Get-ChildItem $sqlUpdatesDir -Filter '*.exe' -File -ErrorAction SilentlyContinue |
-            Sort-Object LastWriteTime -Descending)
-    }
-    if ($sqlUpdates.Count -gt 0) {
-        Log "  [OK] SQL Server update package: $($sqlUpdates[0].Name)" 'Green'
+    $coreDnsExe = Join-Path $RuntimeCache 'coredns\coredns.exe'
+    if (Test-Path $coreDnsExe) {
+        $coreDnsVersion = & $coreDnsExe -version 2>&1 | Select-Object -First 1
+        if ($LASTEXITCODE -eq 0) {
+            Log "  [INFO] Optional legacy CoreDNS present: $coreDnsVersion" 'Gray'
+        } else {
+            Log '  [WARN] Optional legacy CoreDNS is present but did not report a version.' 'Yellow'
+        }
     } else {
-        Log '  [WARN] No SQL Server CU package found in runtime-cache\sqlserver-express\updates' 'Yellow'
+        Log '  [INFO] Optional legacy CoreDNS not present; LAN/offline flow does not require it.' 'Gray'
     }
 }
 
@@ -220,7 +222,7 @@ Step 'Step 3/9 -- Version'
 $versionFile = Join-Path $RootDir 'version.json'
 if (-not (Test-Path $versionFile)) {
     Log '  [WARN] version.json not found -- using defaults' 'Yellow'
-    $ver = [PSCustomObject]@{ appName = 'ParqueRM'; version = '1.0.3' }
+    $ver = [PSCustomObject]@{ appName = 'ParqueRM'; version = '1.0.7' }
 } else {
     $ver = Get-Content $versionFile -Raw | ConvertFrom-Json
 }
@@ -244,7 +246,7 @@ if (Test-Path $ReleaseDir) {
 $releasePaths = @(
     'app\backend', 'app\frontend\dist', 'app\database\init', 'app\database\migrations',
     'app\config', 'app\logs', 'app\tools',
-    'runtime\sqlserver-express', 'runtime\node', 'runtime\caddy', 'runtime\winsw', 'runtime\sqlcmd'
+    'runtime\node', 'runtime\caddy', 'runtime\coredns', 'runtime\winsw', 'runtime\sqlite'
 )
 foreach ($p in $releasePaths) {
     New-Item -ItemType Directory -Path (Join-Path $ReleaseDir $p) -Force | Out-Null
@@ -386,7 +388,7 @@ if (Test-Path $srcTools) {
 if ($SkipRuntimeValidation) {
     Log '  [SKIP] Runtime cache copy (-SkipRuntimeValidation)' 'Yellow'
 } else {
-    foreach ($subDir in @('sqlserver-express', 'node', 'caddy', 'winsw', 'sqlcmd')) {
+    foreach ($subDir in @('node', 'caddy', 'coredns', 'winsw', 'sqlite')) {
         $src = Join-Path $RuntimeCache $subDir
         $dst = Join-Path $ReleaseDir "runtime\$subDir"
         if (Test-Path $src) {

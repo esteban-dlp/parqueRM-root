@@ -1,72 +1,50 @@
 @echo off
-setlocal enabledelayedexpansion
+setlocal EnableExtensions
 
-net session >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    echo Requesting administrator permission...
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
-    exit /b
+set "INSTALL_DIR=%~dp0.."
+for %%I in ("%INSTALL_DIR%") do set "INSTALL_DIR=%%~fI"
+set "DB_FILE=%INSTALL_DIR%\data\parquerm.db"
+set "BACKUP_DIR=%INSTALL_DIR%\backups"
+
+if "%~1"=="" (
+    echo Usage:
+    echo   restore-db.bat "C:\path\to\backup.db"
+    echo.
+    echo Available backups:
+    if exist "%BACKUP_DIR%" dir /b /o-d "%BACKUP_DIR%\*.db"
+    pause
+    exit /b 1
 )
 
-set INSTALL_DIR=C:\ParqueRM
-
-:: Detect sqlcmd
-set SQLCMD_EXE=
-if exist "%INSTALL_DIR%\runtime\sqlcmd\sqlcmd.exe" (
-    set SQLCMD_EXE=%INSTALL_DIR%\runtime\sqlcmd\sqlcmd.exe
-) else (
-    where sqlcmd >nul 2>&1
-    if !ERRORLEVEL! equ 0 set SQLCMD_EXE=sqlcmd
-)
-if "%SQLCMD_EXE%"=="" (
-    echo [ERROR] sqlcmd.exe not found.
-    echo Place sqlcmd.exe in %INSTALL_DIR%\runtime\sqlcmd\ or install SQL Server tools.
-    pause & exit /b 1
-)
-
-echo ParqueRM - Restore Database
-echo ============================
-echo WARNING: This will OVERWRITE the current database with the backup.
-echo All data entered after the backup will be LOST.
-echo.
-set /p BACKUP_FILE=Enter full path to .bak file:
+set "BACKUP_FILE=%~1"
 if not exist "%BACKUP_FILE%" (
-    echo [ERROR] File not found: %BACKUP_FILE%
-    pause & exit /b 1
+    echo [ERROR] Backup file not found:
+    echo   %BACKUP_FILE%
+    pause
+    exit /b 1
 )
 
-echo.
-set /p CONFIRM=Type YES to confirm restore:
-if /i not "%CONFIRM%"=="YES" (
-    echo Cancelled.
-    pause & exit /b 0
-)
+if not exist "%INSTALL_DIR%\data" mkdir "%INSTALL_DIR%\data"
 
-set /p DB_PASS=Enter SQL Server SA password:
-
-echo.
 echo Stopping ParqueRM services...
-net stop ParqueRMFrontend >nul 2>&1
-net stop ParqueRMBackend  >nul 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Stop-Service ParqueRMBackend,ParqueRMFrontend -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2"
 
-echo Restoring database from: %BACKUP_FILE%
-"%SQLCMD_EXE%" -S localhost,1433 -U sa -P "%DB_PASS%" -Q "ALTER DATABASE [ParqueRM] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; RESTORE DATABASE [ParqueRM] FROM DISK='%BACKUP_FILE%' WITH REPLACE; ALTER DATABASE [ParqueRM] SET MULTI_USER;" -b
-
-if %ERRORLEVEL% equ 0 (
-    echo [OK] Restore complete.
-) else (
-    echo [ERROR] Restore failed. Check SQL Server logs.
-    echo The database may be in an inconsistent state.
-    echo Restart SQL Server and try again.
-    goto :restart
+if exist "%DB_FILE%" (
+    copy /Y "%DB_FILE%" "%DB_FILE%.before-restore" >nul
 )
 
-:restart
-echo.
-echo Restarting services...
-net start ParqueRMBackend  >nul 2>&1
-net start ParqueRMFrontend >nul 2>&1
-net start ParqueRMLocalName >nul 2>&1
-echo [OK] Services restarted.
-echo.
+copy /Y "%BACKUP_FILE%" "%DB_FILE%" >nul
+set "RC=%ERRORLEVEL%"
+
+echo Starting ParqueRM services...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Service ParqueRMBackend,ParqueRMFrontend -ErrorAction SilentlyContinue"
+
+if not "%RC%"=="0" (
+    echo [ERROR] Restore failed.
+    pause
+    exit /b %RC%
+)
+
+echo [OK] Database restored:
+echo   %DB_FILE%
 pause

@@ -25,14 +25,8 @@
 .PARAMETER BackendPort
     Port NestJS backend listens on. Default: 3000
 
-.PARAMETER DbName
-    SQL Server database name. Default: ParqueRM
-
-.PARAMETER DbUser
-    SQL Server login. Default: sa
-
-.PARAMETER DbPassword
-    SQL Server password. REQUIRED.
+.PARAMETER DbPath
+    SQLite database file path. Default: InstallDir\data\parquerm.db.
 
 .PARAMETER JwtSecret
     JWT access token secret. REQUIRED.
@@ -43,13 +37,13 @@
 param(
     [string]$InstallDir      = 'C:\ParqueRM',
     [string]$ServerIp        = '',
-    [string]$CanonicalHost   = 'parque.rm.local',
-    [string[]]$AliasHosts    = @('parquerm.local'),
+    [string]$CanonicalHost   = 'parquerm.local',
+    [string[]]$AliasHosts    = @('parque.rm.local', 'parque.rm.home.arpa'),
     [int]$FrontendPort       = 80,
     [int]$BackendPort        = 3000,
-    [string]$DbName          = 'ParqueRM',
-    [string]$DbUser          = 'sa',
-    [string]$DbPassword      = '',
+    [int]$MdnsPort           = 5353,
+    [int]$DiscoveryPort      = 47880,
+    [string]$DbPath          = '',
     [string]$JwtSecret       = '',
     [string]$JwtRefreshSecret = '',
     [switch]$PreserveExistingSecrets
@@ -63,6 +57,9 @@ $BackendDir  = Join-Path $InstallDir 'app\backend'
 $FrontendDist = Join-Path $InstallDir 'app\frontend\dist'
 $ConfigDir   = Join-Path $InstallDir 'config'
 $UploadsDir  = Join-Path $InstallDir 'data\uploads'
+if ([string]::IsNullOrWhiteSpace($DbPath)) {
+    $DbPath = Join-Path $InstallDir 'data\parquerm.db'
+}
 
 foreach ($dir in @($BackendDir, $FrontendDist, $ConfigDir, (Join-Path $UploadsDir 'logos'))) {
     if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
@@ -81,6 +78,17 @@ function Read-DotEnvValue([string]$Path, [string]$Key) {
         }
     }
     return $value
+}
+
+function Read-CentralConfigValue([string]$Path, [string]$Key) {
+    if (-not (Test-Path $Path)) { return '' }
+    try {
+        $config = Get-Content $Path -Raw | ConvertFrom-Json
+        if ($null -ne $config.$Key) { return [string]$config.$Key }
+    } catch {
+        Write-Warning "Could not read $Key from ${Path}: $($_.Exception.Message)"
+    }
+    return ''
 }
 
 function ConvertTo-DotEnvValue([string]$Value) {
@@ -104,7 +112,7 @@ function Get-AppVersion {
         }
     }
 
-    return '1.0.2'
+    return '1.0.7'
 }
 
 function Test-IsVirtualAdapterName([string]$AdapterName) {
@@ -114,6 +122,16 @@ function Test-IsVirtualAdapterName([string]$AdapterName) {
         'VMware',
         'VirtualBox',
         'Hyper-V',
+        'Docker',
+        'VPN',
+        'TAP',
+        'Tailscale',
+        'WireGuard',
+        'OpenVPN',
+        'ZeroTier',
+        'AnyConnect',
+        'Nord',
+        'Radmin',
         'WSL',
         'Loopback',
         'Pseudo',
@@ -147,11 +165,16 @@ function Get-CurrentIpv4Addresses {
         if (Test-IsVirtualAdapterName $adapter.Name) { continue }
         if (Test-IsVirtualAdapterName $adapter.InterfaceDescription) { continue }
 
+        # InterfaceMetric lives on Get-NetIPInterface, not Get-NetIPAddress.
+        $metric = 0
+        $ipInterface = Get-NetIPInterface -InterfaceIndex $addr.InterfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue
+        if ($null -ne $ipInterface) { $metric = $ipInterface.InterfaceMetric }
+
         $addresses += [PSCustomObject]@{
             IP          = $addr.IPAddress
             Adapter     = $adapter.Name
             Description = $adapter.InterfaceDescription
-            Metric      = $addr.InterfaceMetric
+            Metric      = $metric
         }
     }
 
@@ -160,55 +183,55 @@ function Get-CurrentIpv4Addresses {
         Select-Object -ExpandProperty IP -Unique)
 }
 
-function Set-LocalHostsEntries([string[]]$HostNames) {
-    $names = @($HostNames | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
-    if ($names.Count -eq 0) { return $false }
-
+function Test-LocalHostsEntries([string[]]$HostNames) {
     $hostsPath = Join-Path $env:SystemRoot 'System32\drivers\etc\hosts'
-    $marker = '# ParqueRM local URL'
-    $escapedNames = (($names | ForEach-Object { [regex]::Escape($_) }) -join '|')
-    $hostPattern = "(?i)(^|\s)($escapedNames)(\s|$)"
+    if (-not (Test-Path $hostsPath)) { return $false }
 
     try {
-        $lines = @()
-        if (Test-Path $hostsPath) {
-            $lines = @(Get-Content -Path $hostsPath -ErrorAction Stop)
+        $mappedNames = @()
+        foreach ($line in @(Get-Content -Path $hostsPath -ErrorAction Stop)) {
+            $content = ($line -split '#', 2)[0].Trim()
+            if ([string]::IsNullOrWhiteSpace($content)) { continue }
+
+            $tokens = @($content -split '\s+' | Where-Object { $_ })
+            if ($tokens.Count -lt 2 -or $tokens[0] -ne '127.0.0.1') { continue }
+            $mappedNames += @($tokens | Select-Object -Skip 1 | ForEach-Object { $_.ToLowerInvariant() })
         }
 
-        $kept = @()
-        foreach ($line in $lines) {
-            if ($line -match [regex]::Escape($marker)) { continue }
-            if ($line.TrimStart().StartsWith('#')) {
-                $kept += $line
-                continue
-            }
-            if ($line -match $hostPattern) { continue }
-            $kept += $line
+        foreach ($name in $HostNames) {
+            if ($mappedNames -notcontains $name.ToLowerInvariant()) { return $false }
         }
-
-        $newLine = "127.0.0.1`t$($names -join ' ') $marker"
-        Set-Content -Path $hostsPath -Value @($kept + $newLine) -Encoding ASCII -Force
-        Write-Host "  [OK] hosts -> 127.0.0.1 $($names -join ', ')" -ForegroundColor Green
         return $true
     } catch {
-        Write-Warning "Could not update hosts file for $($names -join ', '): $($_.Exception.Message)"
+        Write-Warning "Could not inspect hosts file: $($_.Exception.Message)"
         return $false
     }
 }
 
 $envPath = Join-Path $BackendDir '.env'
+$centralConfigPath = Join-Path $ConfigDir 'parquerm.config.json'
+$InstanceId = ''
 if ($PreserveExistingSecrets -and (Test-Path $envPath)) {
     $existingJwtSecret = Read-DotEnvValue $envPath 'JWT_SECRET'
     $existingJwtRefreshSecret = Read-DotEnvValue $envPath 'JWT_REFRESH_SECRET'
+    $existingInstanceId = Read-DotEnvValue $envPath 'PARQUERM_INSTANCE_ID'
 
     if (-not [string]::IsNullOrWhiteSpace($existingJwtSecret)) { $JwtSecret = $existingJwtSecret }
     if (-not [string]::IsNullOrWhiteSpace($existingJwtRefreshSecret)) { $JwtRefreshSecret = $existingJwtRefreshSecret }
+    if (-not [string]::IsNullOrWhiteSpace($existingInstanceId)) { $InstanceId = $existingInstanceId }
 }
 
-if ([string]::IsNullOrWhiteSpace($DbPassword)) {
-    Write-Error "DbPassword is required."
-    exit 1
+if ([string]::IsNullOrWhiteSpace($InstanceId)) {
+    $existingConfigInstanceId = Read-CentralConfigValue $centralConfigPath 'instanceId'
+    if (-not [string]::IsNullOrWhiteSpace($existingConfigInstanceId)) {
+        $InstanceId = $existingConfigInstanceId
+    }
 }
+
+if ([string]::IsNullOrWhiteSpace($InstanceId)) {
+    $InstanceId = [guid]::NewGuid().ToString('N')
+}
+
 if ([string]::IsNullOrWhiteSpace($JwtSecret) -or $JwtSecret.Length -lt 16) {
     Write-Error "JwtSecret is required and must be at least 16 characters."
     exit 1
@@ -239,7 +262,11 @@ $FrontendUrl = Get-HttpUrl $CanonicalHost $FrontendPort
 $BackendUrl  = "$FrontendUrl/api"
 $SwaggerUrl  = "$FrontendUrl/api/docs"
 $FrontendApiUrl = '/api'
-$AliasUrls = @($LocalHostnames | Select-Object -Skip 1 | ForEach-Object { Get-HttpUrl $_ $FrontendPort })
+$AppVersion = Get-AppVersion
+$VisibleAliasHosts = @($LocalHostnames |
+    Select-Object -Skip 1 |
+    Where-Object { $_ -ne 'parque.rm.home.arpa' })
+$AliasUrls = @($VisibleAliasHosts | ForEach-Object { Get-HttpUrl $_ $FrontendPort })
 $IpFallbackUrls = @(
     (Get-HttpUrl 'localhost' $FrontendPort),
     (Get-HttpUrl '127.0.0.1' $FrontendPort)
@@ -248,49 +275,61 @@ foreach ($ip in $CurrentIpv4Addresses) {
     $IpFallbackUrls += (Get-HttpUrl $ip $FrontendPort)
 }
 $FallbackUrls = @(@($AliasUrls) + @($IpFallbackUrls) | Select-Object -Unique)
-$HostsConfigured = Set-LocalHostsEntries $LocalHostnames
-
-function ConvertTo-SqlLiteral([string]$Value) {
-    return "N'$($Value.Replace("'", "''"))'"
+$HostsConfigured = Test-LocalHostsEntries $LocalHostnames
+if ($HostsConfigured) {
+    Write-Host "  [OK] hosts contains 127.0.0.1 -> $($LocalHostnames -join ', ')" -ForegroundColor Green
+} else {
+    Write-Warning 'The local hosts entries are missing. The dedicated local-name configuration step must repair them.'
 }
 
-function Find-Sqlcmd {
-    $sqlcmdCmd = Get-Command sqlcmd -ErrorAction SilentlyContinue
-    if ($sqlcmdCmd) { return $sqlcmdCmd.Source }
+function ConvertTo-SqliteLiteral([string]$Value) {
+    return "'$($Value.Replace("'", "''"))'"
+}
 
+function Find-Sqlite {
     $candidates = @(
-        (Join-Path $InstallDir 'runtime\sqlcmd\sqlcmd.exe'),
-        'C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\170\Tools\Binn\sqlcmd.exe',
-        'C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\160\Tools\Binn\sqlcmd.exe',
-        'C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\130\Tools\Binn\sqlcmd.exe'
+        (Join-Path $InstallDir 'runtime\sqlite\sqlite3.exe'),
+        (Join-Path $PSScriptRoot '..\runtime-cache\sqlite\sqlite3.exe')
     )
 
     foreach ($candidate in $candidates) {
-        if (Test-Path $candidate) { return $candidate }
+        if (Test-Path $candidate) { return (Resolve-Path $candidate).Path }
     }
+
+    $cmd = Get-Command sqlite3 -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
 
     return ''
 }
 
 function Update-ParkConfigSystemLanUrl([string]$SystemLanUrl) {
-    $sqlcmd = Find-Sqlcmd
-    if ([string]::IsNullOrWhiteSpace($sqlcmd)) {
-        Write-Warning "sqlcmd.exe not found; park_config.system_lan_url was not updated."
+    $sqlite = Find-Sqlite
+    if ([string]::IsNullOrWhiteSpace($sqlite)) {
+        Write-Warning "sqlite3.exe not found; park_config.system_lan_url was not updated."
+        return
+    }
+    if (-not (Test-Path $DbPath)) {
+        Write-Warning "SQLite database not found at $DbPath; park_config.system_lan_url was not updated."
         return
     }
 
-    $urlLiteral = ConvertTo-SqlLiteral $SystemLanUrl
+    $urlLiteral = ConvertTo-SqliteLiteral $SystemLanUrl
     $updateSql = @"
-IF OBJECT_ID(N'dbo.park_config', N'U') IS NOT NULL
-BEGIN
-    UPDATE dbo.park_config
-    SET system_lan_url = $urlLiteral,
-        updated_at = SYSDATETIME();
-END
+UPDATE park_config
+SET system_lan_url = $urlLiteral,
+    updated_at = CURRENT_TIMESTAMP
+WHERE EXISTS (SELECT 1 FROM park_config);
 "@
 
-    $output = & $sqlcmd '-S' '127.0.0.1,1433' '-U' $DbUser '-P' $DbPassword '-d' $DbName '-Q' $updateSql '-b' 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = & $sqlite $DbPath '-batch' $updateSql 2>&1
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($exitCode -ne 0) {
         if ($output) { $output | ForEach-Object { Write-Warning $_ } }
         Write-Error "Failed to update park_config.system_lan_url."
         exit 1
@@ -304,11 +343,10 @@ $envContent = @"
 NODE_ENV=production
 HOST=0.0.0.0
 PORT=$BackendPort
-DB_HOST="127.0.0.1"
-DB_PORT=1433
-DB_USER=$(ConvertTo-DotEnvValue $DbUser)
-DB_PASSWORD=$(ConvertTo-DotEnvValue $DbPassword)
-DB_NAME=$(ConvertTo-DotEnvValue $DbName)
+PARQUERM_VERSION=$(ConvertTo-DotEnvValue $AppVersion)
+PARQUERM_INSTANCE_ID=$(ConvertTo-DotEnvValue $InstanceId)
+DB_TYPE=better-sqlite3
+DB_PATH=$(ConvertTo-DotEnvValue $DbPath)
 JWT_SECRET=$(ConvertTo-DotEnvValue $JwtSecret)
 JWT_REFRESH_SECRET=$(ConvertTo-DotEnvValue $JwtRefreshSecret)
 CORS_ORIGIN=$(ConvertTo-DotEnvValue $FrontendUrl)
@@ -331,7 +369,8 @@ Write-Host "  [OK] Frontend config.json -> $frontendConfigPath" -ForegroundColor
 # --- Central config JSON ------------------------------------------------------
 $centralConfig = [ordered]@{
     appName     = 'ParqueRM'
-    version     = Get-AppVersion
+    version     = $AppVersion
+    instanceId  = $InstanceId
     canonicalHost = $CanonicalHost
     localHostnames = @($LocalHostnames)
     serverIp    = $ServerIp
@@ -343,16 +382,21 @@ $centralConfig = [ordered]@{
     fallbackUrls = @($FallbackUrls)
     hostsConfigured = [bool]$HostsConfigured
     installDir  = $InstallDir
-    dbName      = $DbName
-    dbUser      = $DbUser
+    dbType      = 'better-sqlite3'
+    dbPath      = $DbPath
     ports       = [ordered]@{
         frontend = $FrontendPort
         backend  = $BackendPort
-        sqlserver = 1433
+        mdns     = $MdnsPort
+        discovery = $DiscoveryPort
     }
+    mdnsHostnames = @($LocalHostnames | Where-Object { $_ -ne 'parque.rm.home.arpa' })
+    discoveryPort = $DiscoveryPort
+    legacyDnsServerPreserved = [bool](Get-Service -Name 'ParqueRMDns' -ErrorAction SilentlyContinue)
+    routerSetupRequired = $false
+    primaryFlow = 'lan-offline-local-name'
 } | ConvertTo-Json -Depth 4
 
-$centralConfigPath = Join-Path $ConfigDir 'parquerm.config.json'
 $centralConfig | Out-File -FilePath $centralConfigPath -Encoding utf8 -NoNewline
 Write-Host "  [OK] Central config -> $centralConfigPath" -ForegroundColor Green
 

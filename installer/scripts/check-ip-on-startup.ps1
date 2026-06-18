@@ -5,9 +5,9 @@
     Runs at Windows startup to keep ParqueRM local URL support healthy.
 
 .DESCRIPTION
-    Refreshes local hosts entries, logs current IPv4 addresses, and makes sure
-    ParqueRM services are running. It intentionally does not read or rewrite
-    database/JWT secrets.
+    Refreshes local hosts, logs the current LAN address, and
+    makes sure ParqueRM services are running. It intentionally does not read or
+    rewrite database/JWT secrets.
 #>
 param(
     [string]$InstallDir = 'C:\ParqueRM'
@@ -27,11 +27,12 @@ function Write-Log([string]$msg, [string]$level = 'INFO') {
 }
 
 function Get-CurrentIpv4Addresses {
+    $virtualPatterns = 'Loopback|VirtualBox|VMware|vEthernet|Hyper-V|Docker|VPN|TAP|Tailscale|WireGuard|OpenVPN|ZeroTier|AnyConnect|Nord|Radmin|WSL|Bluetooth|Tunnel'
     @(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
         Where-Object {
             $_.IPAddress -notmatch '^127\.' -and
             $_.IPAddress -notmatch '^169\.254\.' -and
-            $_.InterfaceAlias -notmatch 'Loopback|VirtualBox|VMware|vEthernet|WSL|Bluetooth|Tunnel'
+            $_.InterfaceAlias -notmatch $virtualPatterns
         } |
         Select-Object -ExpandProperty IPAddress -Unique)
 }
@@ -61,7 +62,12 @@ if ($currentIps.Count -gt 0) {
     Write-Log 'No LAN IPv4 address detected yet.' 'WARN'
 }
 
-foreach ($svcName in @('ParqueRMBackend', 'ParqueRMFrontend', 'ParqueRMLocalName')) {
+$serviceNames = @('ParqueRMBackend', 'ParqueRMFrontend', 'ParqueRMLocalName')
+if (Get-Service -Name 'ParqueRMDns' -ErrorAction SilentlyContinue) {
+    $serviceNames += 'ParqueRMDns'
+}
+
+foreach ($svcName in $serviceNames) {
     $svc = Get-Service -Name $svcName -ErrorAction SilentlyContinue
     if (-not $svc) {
         Write-Log "Service $svcName not found." 'WARN'

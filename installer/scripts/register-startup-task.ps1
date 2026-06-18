@@ -48,7 +48,7 @@ Register-ScheduledTask `
     -Trigger   $trigger `
     -Settings  $settings `
     -Principal $principal `
-    -Description 'Verifica la URL local estable de ParqueRM, refresca hosts y arranca servicios.' `
+    -Description 'Verifica ParqueRM, refresca hosts locales y arranca servicios.' `
     | Out-Null
 
 Write-Host "  [OK] Tarea '$taskName' registrada. Se ejecuta 30 segundos despues de cada inicio del sistema." -ForegroundColor Green

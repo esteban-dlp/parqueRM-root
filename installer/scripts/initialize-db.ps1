@@ -2,68 +2,42 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Installs SQL Server Express (if needed) and initializes the ParqueRM database.
+    Initializes the local ParqueRM SQLite database.
 
 .DESCRIPTION
-    1. Detects if SQL Server Express is already installed.
-    2. If not, runs the offline installer from runtime-cache\sqlserver-express\.
-    3. Creates the ParqueRM database if missing.
-    4. Runs all db\init scripts (idempotent -- safe to re-run).
-    5. Runs pending db\migrations.
-
-.PARAMETER InstallDir
-    ParqueRM installation root. Default: C:\ParqueRM
-
-.PARAMETER RuntimeCacheDir
-    Path to runtime-cache. Default: auto-detected from script location.
-
-.PARAMETER DbPassword
-    SQL Server SA password. REQUIRED.
-
-.PARAMETER DbName
-    Database name. Default: ParqueRM
-
-.PARAMETER SkipSqlServerInstall
-    Skip SQL Server Express installation (use if already installed).
-
-.PARAMETER InitScriptsDir
-    Path to db\init scripts folder. Default: auto-detected.
-
-.PARAMETER MigrationsDir
-    Path to db\migrations folder. Default: auto-detected.
+    Creates/uses C:\ParqueRM\data\parquerm.db, runs the SQLite schema/seed
+    scripts, prepares the initial admin user, applies pending migrations, and
+    writes config\db-ready.json for service installation.
 #>
 param(
-    [string]$InstallDir           = 'C:\ParqueRM',
-    [string]$RuntimeCacheDir      = '',
-    [string]$DbPassword           = '',
-    [string]$AdminPassword        = '',
-    [string]$AdminPasswordEnv     = '',
-    [string]$DbName               = 'ParqueRM',
-    [string]$SkipSqlServerInstall = 'false',
-    [string]$InitScriptsDir       = '',
-    [string]$MigrationsDir        = ''
+    [string]$InstallDir       = 'C:\ParqueRM',
+    [string]$RuntimeCacheDir  = '',
+    [string]$AdminPassword    = '',
+    [string]$AdminPasswordEnv = '',
+    [string]$InitScriptsDir   = '',
+    [string]$MigrationsDir    = '',
+    [string]$DbPath           = ''
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$ExitCodeSqlPasswordRetry = 11
-$ExitCodeSqlRebootRequired = 12
-$DefaultAdminPassword = 'admin1'
 
+$DefaultAdminPassword = 'admin1'
 $ScriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
 
 if ([string]::IsNullOrWhiteSpace($RuntimeCacheDir)) {
     $RuntimeCacheDir = Join-Path $InstallDir 'runtime'
 }
+if ([string]::IsNullOrWhiteSpace($DbPath)) {
+    $DbPath = Join-Path $InstallDir 'data\parquerm.db'
+}
 if ([string]::IsNullOrWhiteSpace($InitScriptsDir)) {
-    # Installed path: C:\ParqueRM\app\database\init
     $candidate = Join-Path $InstallDir 'app\database\init'
     if (Test-Path $candidate) {
         $InitScriptsDir = $candidate
     } else {
-        # Dev path: installer\scripts -> installer -> root -> db\init
         $devPath = Join-Path $ScriptDir '..\..\db\init'
-        $InitScriptsDir = if (Test-Path $devPath) { $devPath } else { $candidate }
+        $InitScriptsDir = if (Test-Path $devPath) { (Resolve-Path $devPath).Path } else { $candidate }
     }
 }
 if ([string]::IsNullOrWhiteSpace($MigrationsDir)) {
@@ -72,7 +46,7 @@ if ([string]::IsNullOrWhiteSpace($MigrationsDir)) {
         $MigrationsDir = $candidate
     } else {
         $devPath = Join-Path $ScriptDir '..\..\db\migrations'
-        $MigrationsDir = if (Test-Path $devPath) { $devPath } else { $candidate }
+        $MigrationsDir = if (Test-Path $devPath) { (Resolve-Path $devPath).Path } else { $candidate }
     }
 }
 
@@ -84,38 +58,44 @@ if (-not (Test-Path $ConfigDir)) { New-Item -ItemType Directory -Path $ConfigDir
 $DbReadyPath = Join-Path $ConfigDir 'db-ready.json'
 Remove-Item -Path $DbReadyPath -Force -ErrorAction SilentlyContinue
 
-$skipSqlInstallFlag = $false
-if ($SkipSqlServerInstall -match '^(1|true|yes)$') { $skipSqlInstallFlag = $true }
-
-function Read-DotEnvValue([string]$Path, [string]$Key) {
-    if (-not (Test-Path $Path)) { return '' }
-    $line = Get-Content $Path | Where-Object { $_ -match "^$([regex]::Escape($Key))=" } | Select-Object -First 1
-    if (-not $line) { return '' }
-    $value = ($line -split '=', 2)[1]
-    if ($value.Length -ge 2) {
-        $first = $value.Substring(0, 1)
-        $last = $value.Substring($value.Length - 1, 1)
-        if (($first -eq '"' -and $last -eq '"') -or ($first -eq "'" -and $last -eq "'")) {
-            $value = $value.Substring(1, $value.Length - 2)
-        }
-    }
-    return $value
+function Write-Log([string]$Message, [string]$Color = 'White') {
+    $line = "[$(Get-Date -Format 'HH:mm:ss')] $Message"
+    Write-Host $line -ForegroundColor $Color
+    Add-Content -Path $LogFile -Value $line
 }
 
-if ([string]::IsNullOrWhiteSpace($DbPassword)) {
-    $envPath = Join-Path $InstallDir 'app\backend\.env'
-    $DbPassword = Read-DotEnvValue $envPath 'DB_PASSWORD'
+function Resolve-AdminPassword {
+    if (-not [string]::IsNullOrWhiteSpace($AdminPasswordEnv)) {
+        $envValue = [Environment]::GetEnvironmentVariable($AdminPasswordEnv, 'Process')
+        if ($null -ne $envValue) { return $envValue }
+
+        Write-Log "ERROR: Admin password environment variable '$AdminPasswordEnv' was not available." 'Red'
+        exit 1
+    }
+
+    if (-not [string]::IsNullOrEmpty($AdminPassword)) { return $AdminPassword }
+    return $DefaultAdminPassword
+}
+
+function Get-BackendNodePath {
+    $nodePath = Join-Path $RuntimeCacheDir 'node\node.exe'
+    if (Test-Path $nodePath) { return $nodePath }
+
+    $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCmd -and (Test-Path $nodeCmd.Source)) { return $nodeCmd.Source }
+
+    return ''
 }
 
 function New-BcryptHash([string]$PlainTextPassword) {
     if ([string]::IsNullOrWhiteSpace($PlainTextPassword)) {
-        Write-Log "ERROR: Initial admin password is required." 'Red'
+        Write-Log 'ERROR: Initial admin password is required.' 'Red'
         exit 1
     }
 
     $nodePath = Get-BackendNodePath
     if ([string]::IsNullOrWhiteSpace($nodePath)) {
-        Write-Log "ERROR: node.exe not found; cannot hash admin password." 'Red'
+        Write-Log 'ERROR: node.exe not found; cannot hash admin password.' 'Red'
         exit 1
     }
 
@@ -128,7 +108,7 @@ function New-BcryptHash([string]$PlainTextPassword) {
         try {
             $hash = & $nodePath -e $script
             if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($hash)) {
-                Write-Log "ERROR: Failed to hash admin password." 'Red'
+                Write-Log 'ERROR: Failed to hash admin password.' 'Red'
                 exit 1
             }
             return ($hash | Select-Object -First 1).Trim()
@@ -147,7 +127,7 @@ function Test-BcryptHash([string]$PlainTextPassword, [string]$Hash) {
 
     $nodePath = Get-BackendNodePath
     if ([string]::IsNullOrWhiteSpace($nodePath)) {
-        Write-Log "ERROR: node.exe not found; cannot verify admin password." 'Red'
+        Write-Log 'ERROR: node.exe not found; cannot verify admin password.' 'Red'
         return $false
     }
 
@@ -172,22 +152,6 @@ function Test-BcryptHash([string]$PlainTextPassword, [string]$Hash) {
     }
 }
 
-function Get-BackendNodePath {
-    $nodePath = Join-Path $RuntimeCacheDir 'node\node.exe'
-    if (Test-Path $nodePath) { return $nodePath }
-
-    $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
-    if ($nodeCmd -and (Test-Path $nodeCmd.Source)) { return $nodeCmd.Source }
-
-    return ''
-}
-
-function Write-Log([string]$msg, [string]$color = 'White') {
-    $line = "[$(Get-Date -Format 'HH:mm:ss')] $msg"
-    Write-Host $line -ForegroundColor $color
-    Add-Content -Path $LogFile -Value $line
-}
-
 function Get-SecretFingerprint([string]$Value) {
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($Value)
     $sha = [System.Security.Cryptography.SHA256]::Create()
@@ -201,463 +165,45 @@ function Get-SecretFingerprint([string]$Value) {
     return $hex.Substring(0, 12)
 }
 
-function Resolve-AdminPassword {
-    if (-not [string]::IsNullOrWhiteSpace($AdminPasswordEnv)) {
-        $envValue = [Environment]::GetEnvironmentVariable($AdminPasswordEnv, 'Process')
-        if ($null -ne $envValue) {
-            return $envValue
-        }
-
-        Write-Log "ERROR: Admin password environment variable '$AdminPasswordEnv' was not available to initialize-db.ps1." 'Red'
-        exit 1
+function Find-Sqlite {
+    $candidates = @(
+        (Join-Path $RuntimeCacheDir 'sqlite\sqlite3.exe'),
+        (Join-Path $ScriptDir '..\..\runtime-cache\sqlite\sqlite3.exe')
+    )
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) { return (Resolve-Path $candidate).Path }
     }
 
-    if (-not [string]::IsNullOrEmpty($AdminPassword)) {
-        return $AdminPassword
-    }
+    $cmd = Get-Command sqlite3 -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
 
-    return $DefaultAdminPassword
-}
-
-function ConvertTo-SqlLiteral([string]$Value) {
-    return "N'$($Value.Replace("'", "''"))'"
-}
-
-function Invoke-NativeCommandCapture([scriptblock]$Command) {
-    $previousErrorActionPreference = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    try {
-        $output = & $Command 2>&1
-        $exitCode = $LASTEXITCODE
-        return [PSCustomObject]@{
-            Output   = @($output)
-            ExitCode = $exitCode
-        }
-    } finally {
-        $ErrorActionPreference = $previousErrorActionPreference
-    }
-}
-
-function ConvertTo-WindowsCommandLineArgument([string]$Value) {
-    if ($null -eq $Value) { return '""' }
-
-    $needsQuotes = ($Value.Length -eq 0 -or $Value -match '[\s"]')
-    if (-not $needsQuotes) { return $Value }
-
-    $result = '"'
-    $backslashes = 0
-    foreach ($ch in $Value.ToCharArray()) {
-        if ($ch -eq '\') {
-            $backslashes++
-            continue
-        }
-
-        if ($ch -eq '"') {
-            $result += ('\' * (($backslashes * 2) + 1))
-            $result += '"'
-            $backslashes = 0
-            continue
-        }
-
-        if ($backslashes -gt 0) {
-            $result += ('\' * $backslashes)
-            $backslashes = 0
-        }
-        $result += $ch
-    }
-
-    if ($backslashes -gt 0) {
-        $result += ('\' * ($backslashes * 2))
-    }
-    $result += '"'
-    return $result
-}
-
-function Join-WindowsCommandLine([string[]]$Arguments) {
-    return (($Arguments | ForEach-Object { ConvertTo-WindowsCommandLineArgument $_ }) -join ' ')
-}
-
-function Get-SqlEngineServices {
-    @(Get-Service -Name 'MSSQL*' -ErrorAction SilentlyContinue |
-        Where-Object {
-            $_.Name -eq 'MSSQLSERVER' -or $_.Name -like 'MSSQL$*'
-        } |
-        Sort-Object @{ Expression = { if ($_.Name -eq 'MSSQLSERVER') { 0 } else { 1 } } }, Name)
-}
-
-function Get-SqlInstanceName([string]$ServiceName) {
-    if ($ServiceName -eq 'MSSQLSERVER') { return 'MSSQLSERVER' }
-    if ($ServiceName -like 'MSSQL$*') { return $ServiceName.Substring(6) }
     return ''
 }
 
-function Get-SqlInstanceRegistryId([string]$InstanceName) {
-    $instanceNamesPath = 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL'
-    if (-not (Test-Path $instanceNamesPath)) { return '' }
-    try {
-        $props = Get-ItemProperty -Path $instanceNamesPath -ErrorAction Stop
-        return [string]$props.$InstanceName
-    } catch {
-        return ''
-    }
-}
-
-function Enable-SqlTcpPort1433([string]$ServiceName) {
-    $instanceName = Get-SqlInstanceName $ServiceName
-    $instanceId = Get-SqlInstanceRegistryId $instanceName
-    if ([string]::IsNullOrWhiteSpace($instanceId)) {
-        Write-Log "WARNING: Could not find SQL registry instance id for '$instanceName'. TCP port configuration skipped." 'Yellow'
-        return $false
-    }
-
-    $tcpRoot = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$instanceId\MSSQLServer\SuperSocketNetLib\Tcp"
-    $ipAll = Join-Path $tcpRoot 'IPAll'
-    if (-not (Test-Path $ipAll)) {
-        Write-Log "WARNING: SQL TCP registry path not found: $ipAll" 'Yellow'
-        return $false
-    }
-
-    Write-Log "Configuring SQL Server TCP/IP on 127.0.0.1:1433 for instance '$instanceName'..." 'Yellow'
-    Set-ItemProperty -Path $tcpRoot -Name Enabled -Value 1 -ErrorAction SilentlyContinue
-    Get-ChildItem -Path $tcpRoot -ErrorAction SilentlyContinue |
-        Where-Object { $_.PSChildName -like 'IP*' -and $_.PSChildName -ne 'IPAll' } |
-        ForEach-Object {
-            Set-ItemProperty -Path $_.PSPath -Name Enabled -Value 1 -ErrorAction SilentlyContinue
-            Set-ItemProperty -Path $_.PSPath -Name Active -Value 1 -ErrorAction SilentlyContinue
-        }
-    Set-ItemProperty -Path $ipAll -Name TcpDynamicPorts -Value '' -ErrorAction Stop
-    Set-ItemProperty -Path $ipAll -Name TcpPort -Value '1433' -ErrorAction Stop
-    return $true
-}
-
-function Restart-SqlServiceAndWait([string]$ServiceName) {
-    Write-Log "Restarting SQL Server service $ServiceName..." 'Yellow'
-    Restart-Service -Name $ServiceName -Force -ErrorAction Stop
-    $deadline = (Get-Date).AddSeconds(90)
-    do {
-        $svcNow = Get-Service -Name $ServiceName -ErrorAction Stop
-        if ($svcNow.Status -eq 'Running') {
-            Start-Sleep -Seconds 3
-            Write-Log "SQL Server service $ServiceName is running." 'Green'
-            return
-        }
-        Start-Sleep -Seconds 2
-    } while ((Get-Date) -lt $deadline)
-
-    Write-Log "ERROR: SQL Server service $ServiceName did not return to Running state." 'Red'
+$sqlite = Find-Sqlite
+if ([string]::IsNullOrWhiteSpace($sqlite)) {
+    Write-Log 'ERROR: sqlite3.exe not found. Expected runtime\sqlite\sqlite3.exe.' 'Red'
     exit 1
 }
 
-function Test-LocalSqlTcp {
-    try {
-        return (Test-NetConnection -ComputerName '127.0.0.1' -Port 1433 -InformationLevel Quiet -WarningAction SilentlyContinue)
-    } catch {
-        return $false
-    }
-}
+$DbDir = Split-Path $DbPath -Parent
+if (-not (Test-Path $DbDir)) { New-Item -ItemType Directory -Path $DbDir -Force | Out-Null }
 
-function Get-SystemDriveRoot {
-    $drive = $env:SystemDrive
-    if ([string]::IsNullOrWhiteSpace($drive)) { $drive = 'C:' }
-    return $drive.TrimEnd('\')
-}
-
-function Invoke-FsutilSectorInfo([string]$VolumeRoot) {
-    try {
-        $output = & fsutil fsinfo sectorinfo $VolumeRoot 2>&1
-        return @(Format-CommandOutput $output)
-    } catch {
-        return @("fsutil failed: $($_.Exception.Message)")
-    }
-}
-
-function Get-MaxPhysicalSectorBytes([string[]]$SectorInfoLines) {
-    $values = @()
-    foreach ($line in $SectorInfoLines) {
-        if ($line -match '(?i)(physical|fisic|f.sic|atomic|performance|rendimiento).*?:\s*(\d+)') {
-            $values += [int]$matches[2]
-        }
-    }
-
-    if ($values.Count -eq 0) { return 0 }
-    return ($values | Measure-Object -Maximum).Maximum
-}
-
-function Test-SqlSectorCompatibilityRegistryFixApplied {
-    $path = 'HKLM:\SYSTEM\CurrentControlSet\Services\stornvme\Parameters\Device'
-    if (-not (Test-Path $path)) { return $false }
-
-    try {
-        $props = Get-ItemProperty -Path $path -Name 'ForcedPhysicalSectorSizeInBytes' -ErrorAction Stop
-        $value = @($props.ForcedPhysicalSectorSizeInBytes)
-        return ($value -contains '* 4095')
-    } catch {
-        return $false
-    }
-}
-
-function Enable-SqlSectorCompatibilityIfNeeded {
-    $volume = Get-SystemDriveRoot
-    Write-Log "Checking disk sector compatibility for SQL Server on $volume ..." 'Cyan'
-    $sectorInfo = @(Invoke-FsutilSectorInfo $volume)
-    if ($sectorInfo.Count -gt 0) {
-        $sectorInfo | ForEach-Object { Add-Content -Path $LogFile -Value "  $_" }
-    }
-
-    $maxSectorBytes = Get-MaxPhysicalSectorBytes $sectorInfo
-    if ($maxSectorBytes -le 0) {
-        Write-Log "Could not parse physical sector size from fsutil output. Continuing without registry change." 'Yellow'
-        return
-    }
-
-    Write-Log "Detected max physical sector size: $maxSectorBytes bytes." 'Gray'
-    if ($maxSectorBytes -le 4096) {
-        Write-Log "Disk sector size is compatible with SQL Server." 'Green'
-        return
-    }
-
-    if (Test-SqlSectorCompatibilityRegistryFixApplied) {
-        Write-Log "SQL Server NVMe sector compatibility registry fix is already present." 'Green'
-        return
-    }
-
-    Write-Log "Detected physical sector size greater than 4096 bytes. Applying SQL Server NVMe compatibility registry fix..." 'Yellow'
-    $regPath = 'HKLM:\SYSTEM\CurrentControlSet\Services\stornvme\Parameters\Device'
-    if (-not (Test-Path $regPath)) {
-        New-Item -Path $regPath -Force | Out-Null
-    }
-    New-ItemProperty `
-        -Path $regPath `
-        -Name 'ForcedPhysicalSectorSizeInBytes' `
-        -PropertyType MultiString `
-        -Force `
-        -Value '* 4095' |
-        Out-Null
-
-    Write-Log "SQL Server NVMe sector compatibility registry fix applied." 'Green'
-    Write-Log "Windows must be restarted before SQL Server can be installed or started reliably." 'Yellow'
-    exit $ExitCodeSqlRebootRequired
-}
-
-function Invoke-SqlSectorRecoveryIfNeeded([string]$Context) {
-    $volume = Get-SystemDriveRoot
-    $sectorInfo = @(Invoke-FsutilSectorInfo $volume)
-    $maxSectorBytes = Get-MaxPhysicalSectorBytes $sectorInfo
-    if ($maxSectorBytes -le 4096) { return $false }
-
-    Write-Log "Detected $maxSectorBytes byte physical sectors while handling: $Context" 'Yellow'
-    if (Test-SqlSectorCompatibilityRegistryFixApplied) {
-        Write-Log "SQL Server NVMe sector compatibility registry fix is already present. Reboot Windows and retry the installer." 'Yellow'
-        exit $ExitCodeSqlRebootRequired
-    }
-
-    Write-Log "Applying SQL Server NVMe sector compatibility registry fix after SQL failure..." 'Yellow'
-    $regPath = 'HKLM:\SYSTEM\CurrentControlSet\Services\stornvme\Parameters\Device'
-    if (-not (Test-Path $regPath)) {
-        New-Item -Path $regPath -Force | Out-Null
-    }
-    New-ItemProperty `
-        -Path $regPath `
-        -Name 'ForcedPhysicalSectorSizeInBytes' `
-        -PropertyType MultiString `
-        -Force `
-        -Value '* 4095' |
-        Out-Null
-
-    Write-Log "SQL Server NVMe sector compatibility registry fix applied. Windows restart is required." 'Yellow'
-    exit $ExitCodeSqlRebootRequired
-}
-
-function Write-RecentSqlErrorLogTail {
-    $logRoots = @(
-        'C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\Log',
-        'C:\Program Files\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\Log',
-        'C:\Program Files\Microsoft SQL Server\MSSQL14.MSSQLSERVER\MSSQL\Log'
-    )
-
-    foreach ($root in $logRoots) {
-        if (-not (Test-Path $root)) { continue }
-        $files = @(Get-ChildItem -Path $root -Filter 'ERRORLOG*' -File -ErrorAction SilentlyContinue |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 2)
-        foreach ($file in $files) {
-            Write-Log "SQL Server ERRORLOG tail: $($file.FullName)" 'Gray'
-            Get-Content -Path $file.FullName -Tail 80 -ErrorAction SilentlyContinue |
-                ForEach-Object { Add-Content -Path $LogFile -Value "  $_" }
-        }
-        return
-    }
-}
-
-function Find-SqlServerUpdatePackage {
-    $updatesDir = Join-Path $RuntimeCacheDir 'sqlserver-express\updates'
-    if (-not (Test-Path $updatesDir)) { return $null }
-
-    return Get-ChildItem -Path $updatesDir -Filter '*.exe' -File -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -match '(?i)(SQLServer.*KB|KB\d+|CU)' } |
-        Sort-Object LastWriteTime -Descending |
-        Select-Object -First 1
-}
-
-function ConvertTo-VersionOrNull([string]$Value) {
-    if ([string]::IsNullOrWhiteSpace($Value)) { return $null }
-    try {
-        return [version]$Value
-    } catch {
-        return $null
-    }
-}
-
-function Get-InstalledSqlEngineVersions {
-    $versions = @()
-    foreach ($service in @(Get-SqlEngineServices)) {
-        $instanceName = Get-SqlInstanceName $service.Name
-        $instanceId = Get-SqlInstanceRegistryId $instanceName
-        if ([string]::IsNullOrWhiteSpace($instanceId)) { continue }
-
-        $setupPath = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$instanceId\Setup"
-        if (-not (Test-Path $setupPath)) { continue }
-
-        try {
-            $props = Get-ItemProperty -Path $setupPath -ErrorAction Stop
-            foreach ($propName in @('PatchLevel', 'Version')) {
-                $version = ConvertTo-VersionOrNull ([string]$props.$propName)
-                if ($null -ne $version) { $versions += $version }
-            }
-        } catch {
-            continue
-        }
-    }
-
-    return @($versions | Sort-Object -Descending -Unique)
-}
-
-function Get-LatestSqlSetupSummary([datetime]$Since) {
-    $setupLogRoot = Join-Path ${env:ProgramFiles} 'Microsoft SQL Server\160\Setup Bootstrap\Log'
-    if (-not (Test-Path $setupLogRoot)) { return $null }
-
-    $summaryFiles = @(Get-ChildItem -Path $setupLogRoot -Filter 'Summary.txt' -File -Recurse -ErrorAction SilentlyContinue |
-        Where-Object { $_.LastWriteTime -ge $Since.AddMinutes(-5) } |
-        Sort-Object LastWriteTime -Descending)
-
-    if ($summaryFiles.Count -eq 0) { return $null }
-    return $summaryFiles[0]
-}
-
-function Get-SqlEngineVersionsFromSetupSummary([string]$Summary) {
-    $versions = @()
-    $featureBlock = $Summary
-    if ($Summary -match '(?s)Product features discovered:(.*?)Package properties:') {
-        $featureBlock = $matches[1]
-    }
-
-    foreach ($match in [regex]::Matches($featureBlock, '\b\d+\.\d+\.\d+\.\d+\b')) {
-        $version = ConvertTo-VersionOrNull $match.Value
-        if ($null -ne $version) { $versions += $version }
-    }
-
-    return @($versions | Sort-Object -Descending -Unique)
-}
-
-function Test-SqlUpdateNoopAlreadyApplied([int]$ExitCode, [datetime]$StartedAt) {
-    if ($ExitCode -ne -2042429437) { return $false }
-
-    $summaryFile = Get-LatestSqlSetupSummary $StartedAt
-    if (-not $summaryFile) { return $false }
-
-    $summary = Get-Content -Path $summaryFile.FullName -Raw -ErrorAction SilentlyContinue
-    if ([string]::IsNullOrWhiteSpace($summary)) { return $false }
-    if ($summary -notmatch 'No features were updated during the setup execution') { return $false }
-
-    $patchLevel = $null
-    if ($summary -match '(?m)^\s*PatchLevel:\s*(\d+\.\d+\.\d+\.\d+)\s*$') {
-        $patchLevel = ConvertTo-VersionOrNull $matches[1]
-    }
-    if ($null -eq $patchLevel) { return $false }
-
-    $installedVersions = @(
-        Get-InstalledSqlEngineVersions
-        Get-SqlEngineVersionsFromSetupSummary $summary
-    ) | Sort-Object -Descending -Unique
-    $matchingVersion = $installedVersions | Where-Object { $_ -ge $patchLevel } | Select-Object -First 1
-    if ($null -eq $matchingVersion) { return $false }
-
-    Write-Log "SQL Server update package reported no features to update; installed SQL version $matchingVersion is already at or above patch level $patchLevel. Continuing." 'Green'
-    return $true
-}
-
-function Invoke-SqlServerUpdateIfAvailable {
-    $updatePackage = Find-SqlServerUpdatePackage
-    if (-not $updatePackage) {
-        Write-Log "No SQL Server cumulative update package found in runtime\sqlserver-express\updates." 'Gray'
-        return
-    }
-
-    Write-Log "Applying SQL Server update package: $($updatePackage.FullName)" 'Yellow'
-    $patchArgs = Join-WindowsCommandLine @(
-        '/quiet',
-        '/IAcceptSQLServerLicenseTerms',
-        '/Action=Patch',
-        '/AllInstances'
-    )
-    $startedAt = Get-Date
-    $proc = Start-Process -FilePath $updatePackage.FullName -ArgumentList $patchArgs -Wait -PassThru
-    if ($proc.ExitCode -eq 0) {
-        Write-Log "SQL Server update package completed successfully." 'Green'
-        return
-    }
-    if ($proc.ExitCode -eq 3010 -or $proc.ExitCode -eq 1641) {
-        Write-Log "SQL Server update package completed and requires Windows restart (exit code $($proc.ExitCode))." 'Yellow'
-        exit $ExitCodeSqlRebootRequired
-    }
-    if (Test-SqlUpdateNoopAlreadyApplied $proc.ExitCode $startedAt) {
-        return
-    }
-
-    Write-Log "ERROR: SQL Server update package failed (exit code $($proc.ExitCode))." 'Red'
-    Write-RecentSqlErrorLogTail
-    Invoke-SqlSectorRecoveryIfNeeded "SQL Server update package exit code $($proc.ExitCode)" | Out-Null
-    exit 1
-}
-
-function Start-SqlServiceAndWait([string]$ServiceName) {
-    Write-Log "Starting SQL Server service $ServiceName..." 'Yellow'
-    try {
-        Start-Service $ServiceName -ErrorAction Stop
-    } catch {
-        Write-Log "ERROR: Could not start SQL Server service ${ServiceName}: $($_.Exception.Message)" 'Red'
-        Write-Log "       If this is a new NVMe/modern disk machine, check diagnostics for fsutil sector info and SQL ERRORLOG." 'Yellow'
-        Write-RecentSqlErrorLogTail
-        Invoke-SqlSectorRecoveryIfNeeded "SQL Server service start failure" | Out-Null
-        exit 1
-    }
-
-    $deadline = (Get-Date).AddSeconds(90)
-    do {
-        $svcNow = Get-Service -Name $ServiceName -ErrorAction Stop
-        if ($svcNow.Status -eq 'Running') {
-            Start-Sleep -Seconds 3
-            Write-Log "SQL Server service $ServiceName is running." 'Green'
-            return
-        }
-        Start-Sleep -Seconds 2
-    } while ((Get-Date) -lt $deadline)
-
-    Write-Log "ERROR: SQL Server service $ServiceName did not reach Running state." 'Red'
-    Write-RecentSqlErrorLogTail
-    Invoke-SqlSectorRecoveryIfNeeded "SQL Server service did not reach Running" | Out-Null
-    exit 1
-}
-
-function Invoke-SqlcmdChecked {
+function Invoke-SqliteChecked {
     param(
         [string[]]$Arguments,
         [string]$FailureMessage
     )
 
-    $result = Invoke-NativeCommandCapture { & $sqlcmd @Arguments }
-    $output = $result.Output
-    $exitCode = $result.ExitCode
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = & $sqlite @Arguments 2>&1
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
     if ($output) {
         $output | ForEach-Object { Add-Content -Path $LogFile -Value $_ }
     }
@@ -668,394 +214,162 @@ function Invoke-SqlcmdChecked {
         }
         exit 1
     }
-    return $output
+
+    return @($output | ForEach-Object { $_.ToString() })
 }
 
-function Format-CommandOutput([object[]]$Output) {
-    return @($Output | ForEach-Object {
-        if ($null -eq $_) { '' } else { $_.ToString() }
-    } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+function Invoke-SqliteQuery([string]$Sql, [string]$FailureMessage = 'SQLite query failed.') {
+    return @(Invoke-SqliteChecked -Arguments @($DbPath, '-batch', '-noheader', $Sql) -FailureMessage $FailureMessage)
 }
 
-function Test-SqlcmdUnsupportedOption([object[]]$Output, [string]$OptionName) {
-    $text = (@(Format-CommandOutput $Output) -join "`n")
-    if ([string]::IsNullOrWhiteSpace($text)) { return $false }
-
-    $escapedOption = [regex]::Escape($OptionName)
-    $optionFirstPattern = "(?i)(^|\s|:)[`"'\-]?$escapedOption[`"']?\s*:\s*unknown\s+(option|flag)"
-    $unknownFirstPattern = "(?i)unknown\s+(option|flag|shorthand\s+flag).*?[`"'\-]?$escapedOption\b"
-    return (($text -match $optionFirstPattern) -or ($text -match $unknownFirstPattern))
+function Invoke-SqliteFile([string]$FilePath) {
+    $fileName = Split-Path $FilePath -Leaf
+    $readArg = ".read '$($FilePath.Replace("'", "''"))'"
+    Invoke-SqliteChecked -Arguments @($DbPath, '-batch', $readArg) -FailureMessage "SQL script failed: $fileName" | Out-Null
 }
 
-function Write-SqlcmdOutputToLog([object[]]$Output) {
-    $lines = @(Format-CommandOutput $Output)
-    if ($lines.Count -gt 0) {
-        $lines | ForEach-Object { Add-Content -Path $LogFile -Value $_ }
-    }
-}
-
-function Invoke-SqlcmdFileChecked {
-    param(
-        [string[]]$Arguments,
-        [string]$FilePath,
-        [string]$FailureMessage
-    )
-
-    $argsWithUtf8 = @($Arguments + @('-f', '65001', '-i', $FilePath, '-b'))
-    $result = Invoke-NativeCommandCapture { & $sqlcmd @argsWithUtf8 }
-    if ($result.ExitCode -ne 0 -and (Test-SqlcmdUnsupportedOption $result.Output 'f')) {
-        Write-SqlcmdOutputToLog $result.Output
-        Write-Log "sqlcmd does not support -f 65001; retrying $(Split-Path $FilePath -Leaf) without the UTF-8 flag." 'Yellow'
-        $argsDefaultEncoding = @($Arguments + @('-i', $FilePath, '-b'))
-        $result = Invoke-NativeCommandCapture { & $sqlcmd @argsDefaultEncoding }
-    }
-
-    Write-SqlcmdOutputToLog $result.Output
-    if ($result.ExitCode -ne 0) {
-        Write-Log $FailureMessage 'Red'
-        $details = @(Format-CommandOutput $result.Output)
-        if ($details.Count -gt 0) {
-            $details | Select-Object -Last 8 | ForEach-Object { Write-Log "  $_" 'Red' }
-        }
-        exit 1
-    }
+function Test-TableExists([string]$TableName) {
+    $escaped = $TableName.Replace("'", "''")
+    $rows = @(Invoke-SqliteQuery "SELECT name FROM sqlite_master WHERE type='table' AND name='$escaped' LIMIT 1;" 'Failed to inspect SQLite schema.')
+    return (@($rows | Where-Object { $_.Trim() -eq $TableName }).Count -gt 0)
 }
 
 function Test-AdminUserExists {
-    $checkSql = @"
-SET NOCOUNT ON;
-IF OBJECT_ID(N'dbo.users', N'U') IS NULL
-    SELECT 0;
-ELSE
-    EXEC sp_executesql N'IF EXISTS (SELECT 1 FROM dbo.users WHERE username = N''admin'') SELECT 1; ELSE SELECT 0;';
-"@
-
-    $rows = Invoke-SqlcmdChecked `
-        -Arguments ($sqlArgs + @('-d', $DbName, '-Q', $checkSql, '-h', '-1', '-W', '-b')) `
-        -FailureMessage 'Failed to inspect existing admin user.'
-
-    $value = @($rows | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ } | Select-Object -First 1)
-    return ($value -eq '1')
+    if (-not (Test-TableExists 'users')) { return $false }
+    $rows = @(Invoke-SqliteQuery "SELECT 1 FROM users WHERE username='admin' LIMIT 1;" 'Failed to inspect existing admin user.')
+    return (@($rows | Where-Object { $_.Trim() -eq '1' }).Count -gt 0)
 }
 
-function Test-SaLogin([string[]]$Arguments) {
-    $result = Invoke-NativeCommandCapture { & $sqlcmd @Arguments '-Q' 'SELECT 1' '-b' }
-    $output = $result.Output
-    $exitCode = $result.ExitCode
-    if ($exitCode -ne 0 -and $output) {
-        $output | ForEach-Object { Add-Content -Path $LogFile -Value $_ }
-    }
-    return ($exitCode -eq 0)
-}
-
-function Repair-SaLoginWithWindowsAuth([string]$Password) {
-    $passwordLiteral = ConvertTo-SqlLiteral $Password
-    $instanceId = Get-SqlInstanceRegistryId $sqlInstanceName
-    if (-not [string]::IsNullOrWhiteSpace($instanceId)) {
-        $loginModePath = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$instanceId\MSSQLServer"
-        if (Test-Path $loginModePath) {
-            Set-ItemProperty -Path $loginModePath -Name LoginMode -Value 2 -ErrorAction SilentlyContinue
-        }
-    }
-    $repairSql = @"
-ALTER LOGIN [sa] ENABLE;
-ALTER LOGIN [sa] WITH PASSWORD=$passwordLiteral UNLOCK;
-"@
-
-    Write-Log "Attempting to enable/update SQL 'sa' login using Windows authentication..." 'Yellow'
-    $result = Invoke-NativeCommandCapture { & $sqlcmd '-S' '127.0.0.1,1433' '-E' '-Q' $repairSql '-b' }
-    $output = $result.Output
-    $exitCode = $result.ExitCode
-    if ($output) {
-        $output | ForEach-Object { Add-Content -Path $LogFile -Value $_ }
-    }
-    if ($exitCode -ne 0) {
-        Write-Log "ERROR: Could not login with 'sa', and Windows authentication could not repair it." 'Red'
-        Write-Log "       If SQL Server was already installed, enter the current SQL 'sa' password or reset it manually." 'Yellow'
-        if ($output) {
-            $output | Select-Object -Last 8 | ForEach-Object { Write-Log "  $_" 'Red' }
-        }
-        exit $ExitCodeSqlPasswordRetry
-    }
-    return $true
+function Get-AdminPasswordHash {
+    $rows = @(Invoke-SqliteQuery "SELECT password_hash FROM users WHERE username='admin' LIMIT 1;" 'Failed to verify initial admin user password.')
+    return @($rows | ForEach-Object { $_.Trim() } | Where-Object { $_ } | Select-Object -First 1)
 }
 
 trap {
     try {
         Write-Log "UNHANDLED ERROR: $($_.Exception.Message)" 'Red'
-        if ($_.ScriptStackTrace) {
-            Write-Log "STACK: $($_.ScriptStackTrace)" 'Red'
-        }
+        if ($_.ScriptStackTrace) { Write-Log "STACK: $($_.ScriptStackTrace)" 'Red' }
     } catch {
         Write-Host "UNHANDLED ERROR: $($_.Exception.Message)" -ForegroundColor Red
     }
     exit 1
 }
 
-# --- Locate sqlcmd ------------------------------------------------------------
-$sqlcmdCmd = Get-Command sqlcmd -ErrorAction SilentlyContinue
-$sqlcmd = if ($sqlcmdCmd) { $sqlcmdCmd.Source } else { $null }
-if (-not $sqlcmd) {
-    $candidates = @(
-        'C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\170\Tools\Binn\sqlcmd.exe',
-        'C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\160\Tools\Binn\sqlcmd.exe',
-        (Join-Path $RuntimeCacheDir 'sqlcmd\sqlcmd.exe')
-    )
-    foreach ($c in $candidates) { if (Test-Path $c) { $sqlcmd = $c; break } }
-}
-
-# --- Preflight: SQL Server disk sector compatibility --------------------------
-Write-Log "=== Preflight: SQL Server disk sector compatibility ===" 'Cyan'
-Enable-SqlSectorCompatibilityIfNeeded
-
-# --- Step 1: SQL Server Express install ---------------------------------------
-Write-Log "=== Step 1: SQL Server Express ===" 'Cyan'
-
-$sqlServerInstalled = $false
-$engineServices = @(Get-SqlEngineServices)
-if ($engineServices.Count -gt 0) {
-    $sqlServerInstalled = $true
-    Write-Log "SQL Server already installed: $($engineServices.Name -join ', ')" 'Green'
-}
-
-if (-not $sqlServerInstalled -and -not $skipSqlInstallFlag) {
-    if ([string]::IsNullOrWhiteSpace($DbPassword)) {
-        Write-Log "ERROR: DbPassword is required to install SQL Server." 'Red'
-        exit 1
-    }
-
-    $sqlExpressCache = Join-Path $RuntimeCacheDir 'sqlserver-express'
-    $sqlSetup = Get-ChildItem $sqlExpressCache -Filter 'SQLEXPR*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
-    if (-not $sqlSetup) {
-        Write-Log "ERROR: SQL Server Express installer not found in: $sqlExpressCache" 'Red'
-        Write-Log "Place SQLEXPR_x64_ENU.exe (or similar) in that folder." 'Yellow'
-        exit 1
-    }
-
-    Write-Log "Installing SQL Server Express from $($sqlSetup.FullName) ..." 'Yellow'
-    $updatesDir = Join-Path $sqlExpressCache 'updates'
-    $sqlSetupArgs = @(
-        '/Q',
-        '/ACTION=Install',
-        '/FEATURES=SQLEngine',
-        '/INSTANCENAME=MSSQLSERVER',
-        '/SECURITYMODE=SQL',
-        "/SAPWD=$DbPassword",
-        '/TCPENABLED=1',
-        '/IACCEPTSQLSERVERLICENSETERMS'
-    )
-    if (Test-Path $updatesDir) {
-        $updatePackages = @(Get-ChildItem -Path $updatesDir -Filter '*.exe' -File -ErrorAction SilentlyContinue)
-        if ($updatePackages.Count -gt 0) {
-            Write-Log "SQL Server setup will use update source: $updatesDir" 'Gray'
-            $sqlSetupArgs += '/UPDATEENABLED=True'
-            $sqlSetupArgs += "/UPDATESOURCE=$updatesDir"
-        }
-    }
-    $sqlArgs = Join-WindowsCommandLine $sqlSetupArgs
-    $proc = Start-Process -FilePath $sqlSetup.FullName -ArgumentList $sqlArgs -Wait -PassThru
-    if ($proc.ExitCode -ne 0 -and $proc.ExitCode -ne 3010) {
-        Write-Log "SQL Server installation failed (exit code $($proc.ExitCode))." 'Red'
-        Write-Log "This can happen when SQL Server rejects the provided 'sa' password. The installer should ask for a different SQL password and retry." 'Yellow'
-        Write-RecentSqlErrorLogTail
-        exit $ExitCodeSqlPasswordRetry
-    }
-    Write-Log "SQL Server Express installed successfully." 'Green'
-    if ($proc.ExitCode -eq 3010) {
-        Write-Log "SQL Server installation requires Windows restart." 'Yellow'
-        exit $ExitCodeSqlRebootRequired
-    }
-}
-
-$engineServices = @(Get-SqlEngineServices)
-if ($engineServices.Count -gt 0) {
-    Invoke-SqlServerUpdateIfAvailable
-}
-
-# --- Step 2: Ensure SQL Server service is running -----------------------------
-Write-Log "=== Step 2: SQL Server service ===" 'Cyan'
-$engineServices = @(Get-SqlEngineServices)
-$svc = $engineServices | Select-Object -First 1
-if (-not $svc) {
-    Write-Log "ERROR: Could not find SQL Server service. Check installation." 'Red'
-    exit 1
-}
-$sqlServiceName = $svc.Name
-$sqlInstanceName = Get-SqlInstanceName $sqlServiceName
-Write-Log "Using SQL Server service: $sqlServiceName (instance: $sqlInstanceName)" 'Gray'
-if ($svc.Status -ne 'Running') {
-    Start-SqlServiceAndWait $sqlServiceName
-} else {
-    Write-Log "SQL Server service is running." 'Green'
-}
-
-# --- Step 3: Ensure sqlcmd available -----------------------------------------
-if (-not $sqlcmd) {
-    Write-Log "ERROR: sqlcmd not found. Install SQL Server Command Line Tools." 'Red'
-    exit 1
-}
-Write-Log "Using sqlcmd: $sqlcmd" 'Gray'
-
-if ([string]::IsNullOrWhiteSpace($DbPassword)) {
-    Write-Log "ERROR: DbPassword is required to initialize database '$DbName'." 'Red'
-    exit 1
-}
-
-if (Enable-SqlTcpPort1433 $sqlServiceName) {
-    Restart-SqlServiceAndWait $sqlServiceName
-}
-
-if (-not (Test-LocalSqlTcp)) {
-    Write-Log "ERROR: SQL Server is not listening on 127.0.0.1:1433." 'Red'
-    Write-Log "       Check SQL Server TCP/IP configuration and make sure no other process is using port 1433." 'Yellow'
-    exit 1
-}
-Write-Log "SQL Server is listening on 127.0.0.1:1433." 'Green'
-
-$sqlArgs = @('-S', '127.0.0.1,1433', '-U', 'sa', '-P', $DbPassword)
-if (-not (Test-SaLogin $sqlArgs)) {
-    Repair-SaLoginWithWindowsAuth $DbPassword | Out-Null
-    Restart-SqlServiceAndWait $sqlServiceName
-    if (-not (Test-SaLogin $sqlArgs)) {
-        Write-Log "ERROR: SQL 'sa' login still failed after repair attempt." 'Red'
-        exit $ExitCodeSqlPasswordRetry
-    }
-}
-Write-Log "SQL 'sa' login verified." 'Green'
-
-# --- Step 4: Create database --------------------------------------------------
-Write-Log "=== Step 3: Creating database '$DbName' ===" 'Cyan'
-$createDb = "IF DB_ID('$DbName') IS NULL BEGIN CREATE DATABASE [$DbName]; END"
-Invoke-SqlcmdChecked -Arguments ($sqlArgs + @('-Q', $createDb, '-b')) -FailureMessage "Failed to create database '$DbName'." | Out-Null
-Write-Log "Database '$DbName' ready." 'Green'
+Write-Log '=== SQLite database initialization ===' 'Cyan'
+Write-Log "Using sqlite3: $sqlite" 'Gray'
+Write-Log "Database file: $DbPath" 'Gray'
 
 $adminUserExistedBeforeInit = Test-AdminUserExists
 $adminPasswordExplicitlyProvided = (
     -not [string]::IsNullOrWhiteSpace($AdminPasswordEnv) -or
     -not [string]::IsNullOrEmpty($AdminPassword)
 )
-if ($adminUserExistedBeforeInit) {
-    if ($adminPasswordExplicitlyProvided) {
-        Write-Log "Existing admin user found before init scripts. Its password will be reset to the installer-provided value." 'Gray'
-    } else {
-        Write-Log "Existing admin user found before init scripts. Its password will be preserved." 'Gray'
-    }
+
+Write-Log '=== Migration tracking table ===' 'Cyan'
+$schemaMigrationScript = Join-Path $MigrationsDir '001_create_schema_migrations.sql'
+if (Test-Path $schemaMigrationScript) {
+    Invoke-SqliteFile $schemaMigrationScript
+    Write-Log '  [OK] 001_create_schema_migrations.sql' 'Green'
 } else {
-    Write-Log "No existing admin user found before init scripts. Initial admin password will be '$DefaultAdminPassword'." 'Gray'
+    Invoke-SqliteQuery @"
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    migration_name TEXT NOT NULL UNIQUE,
+    checksum TEXT NULL,
+    applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+"@ 'Failed to ensure schema_migrations table.' | Out-Null
+    Write-Log '  [OK] schema_migrations ensured inline' 'Green'
 }
 
-# --- Step 5: Run init scripts -------------------------------------------------
-Write-Log "=== Step 4: Init scripts ===" 'Cyan'
+Write-Log '=== Init scripts ===' 'Cyan'
 if (-not (Test-Path $InitScriptsDir)) {
-    Write-Log "Init scripts directory not found: $InitScriptsDir" 'Yellow'
-} else {
-    $initFiles = Get-ChildItem $InitScriptsDir -Filter '*.sql' | Sort-Object Name |
-        Where-Object { $_.Name -ne '01_create_database.sql' }  # DB already created above
-
-    foreach ($f in $initFiles) {
-        Write-Log "  Running $($f.Name) ..." 'Yellow'
-        Invoke-SqlcmdFileChecked -Arguments ($sqlArgs + @('-d', $DbName)) -FilePath $f.FullName -FailureMessage "Init script failed: $($f.Name)"
-        Write-Log "  [OK] $($f.Name)" 'Green'
-    }
+    Write-Log "ERROR: Init scripts directory not found: $InitScriptsDir" 'Red'
+    exit 1
 }
 
-# --- Step 5b: Prepare initial admin password ----------------------------------
-Write-Log "=== Step 4b: Admin user password ===" 'Cyan'
+$initFiles = @(Get-ChildItem $InitScriptsDir -Filter '*.sql' -File | Sort-Object Name)
+foreach ($file in $initFiles) {
+    Write-Log "  Running $($file.Name) ..." 'Yellow'
+    Invoke-SqliteFile $file.FullName
+    Write-Log "  [OK] $($file.Name)" 'Green'
+}
+
+Write-Log '=== Admin user password ===' 'Cyan'
 if ($adminUserExistedBeforeInit -and -not $adminPasswordExplicitlyProvided) {
-    Write-Log "Admin user already existed before this install. Existing admin password was preserved." 'Green'
+    Write-Log 'Admin user already existed before this install. Existing admin password was preserved.' 'Green'
 } else {
-    $AdminPassword = Resolve-AdminPassword
-    if ([string]::IsNullOrWhiteSpace($AdminPassword)) {
-        Write-Log "ERROR: Initial admin password is required." 'Red'
-        exit 1
-    }
-    Write-Log "Initial admin password ready for hashing (length: $($AdminPassword.Length), sha256-12: $(Get-SecretFingerprint $AdminPassword))." 'Gray'
-    $AdminPasswordHash = New-BcryptHash $AdminPassword
-    $adminHashSql = $AdminPasswordHash.Replace("'", "''")
+    $resolvedAdminPassword = Resolve-AdminPassword
+    Write-Log "Initial admin password ready for hashing (length: $($resolvedAdminPassword.Length), sha256-12: $(Get-SecretFingerprint $resolvedAdminPassword))." 'Gray'
+    $adminPasswordHash = New-BcryptHash $resolvedAdminPassword
+    $adminHashSql = $adminPasswordHash.Replace("'", "''")
+
     $setAdminPasswordSql = @"
-DECLARE @adminRoleId INT = (SELECT TOP 1 id FROM dbo.roles WHERE name = N'Administrador' ORDER BY id);
+PRAGMA foreign_keys = ON;
+UPDATE roles
+SET is_active = 1,
+    deleted_at = NULL,
+    updated_at = CURRENT_TIMESTAMP
+WHERE name = 'Administrador';
 
-IF @adminRoleId IS NOT NULL
-BEGIN
-    UPDATE dbo.roles
-    SET is_active = 1,
-        deleted_at = NULL,
-        updated_at = SYSDATETIME()
-    WHERE id = @adminRoleId;
-END
+INSERT OR IGNORE INTO users (
+    role_id,
+    username,
+    password_hash,
+    full_name,
+    email,
+    is_active,
+    last_login_at,
+    created_at,
+    updated_at
+)
+SELECT
+    (SELECT id FROM roles WHERE name = 'Administrador' ORDER BY id LIMIT 1),
+    'admin',
+    '$adminHashSql',
+    'Administrador del Sistema',
+    'admin@parquerm.local',
+    1,
+    NULL,
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP;
 
-UPDATE dbo.users
-SET password_hash = N'$adminHashSql',
-    role_id = COALESCE(@adminRoleId, role_id),
+UPDATE users
+SET password_hash = '$adminHashSql',
+    role_id = COALESCE((SELECT id FROM roles WHERE name = 'Administrador' ORDER BY id LIMIT 1), role_id),
     is_active = 1,
     deleted_at = NULL,
-    updated_at = SYSDATETIME()
-WHERE username = N'admin';
-
-IF @@ROWCOUNT = 0
-BEGIN
-    INSERT INTO dbo.users
-    (
-        role_id,
-        username,
-        password_hash,
-        full_name,
-        email,
-        is_active,
-        last_login_at,
-        created_at,
-        updated_at
-    )
-    VALUES
-    (
-        @adminRoleId,
-        N'admin',
-        N'$adminHashSql',
-        N'Administrador del Sistema',
-        N'admin@parquerm.local',
-        1,
-        NULL,
-        SYSDATETIME(),
-        SYSDATETIME()
-    );
-END
+    updated_at = CURRENT_TIMESTAMP
+WHERE username = 'admin';
 "@
 
-    Invoke-SqlcmdChecked -Arguments ($sqlArgs + @('-d', $DbName, '-Q', $setAdminPasswordSql, '-b')) -FailureMessage 'Failed to set initial admin user password.' | Out-Null
-
-    $storedAdminHashRows = Invoke-SqlcmdChecked `
-        -Arguments ($sqlArgs + @('-d', $DbName, '-Q', "SET NOCOUNT ON; SELECT password_hash FROM dbo.users WHERE username = N'admin';", '-h', '-1', '-W', '-b')) `
-        -FailureMessage 'Failed to verify initial admin user password.'
-    $storedAdminHash = @($storedAdminHashRows | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ } | Select-Object -First 1)
-    if (-not (Test-BcryptHash $AdminPassword $storedAdminHash)) {
-        Write-Log "ERROR: Initial admin user password was written, but bcrypt verification did not match." 'Red'
+    Invoke-SqliteQuery $setAdminPasswordSql 'Failed to set initial admin user password.' | Out-Null
+    $storedAdminHash = Get-AdminPasswordHash
+    if (-not (Test-BcryptHash $resolvedAdminPassword $storedAdminHash)) {
+        Write-Log 'ERROR: Initial admin user password was written, but bcrypt verification did not match.' 'Red'
         exit 1
     }
-    Write-Log "Initial admin user password ready and verified." 'Green'
+    Write-Log 'Initial admin user password ready and verified.' 'Green'
 }
 
-# --- Step 6: Run migrations ---------------------------------------------------
-Write-Log "=== Step 5: Migrations ===" 'Cyan'
+Write-Log '=== Migrations ===' 'Cyan'
 $migrateScript = Join-Path $ScriptDir 'run-migrations.ps1'
 if (Test-Path $migrateScript) {
-    try {
-        & $migrateScript -SqlcmdPath $sqlcmd -DbHost '127.0.0.1' -DbPassword $DbPassword -DbName $DbName -MigrationsDir $MigrationsDir
-    } catch {
-        Write-Log "Migration step failed: $($_.Exception.Message)" 'Red'
+    & $migrateScript -SqlitePath $sqlite -DbPath $DbPath -RuntimeDir $RuntimeCacheDir -MigrationsDir $MigrationsDir
+    if ($LASTEXITCODE -ne 0) {
+        Write-Log 'Migration step failed.' 'Red'
         exit 1
     }
 } else {
-    Write-Log "run-migrations.ps1 not found -- skipping." 'Yellow'
+    Write-Log 'run-migrations.ps1 not found -- skipping.' 'Yellow'
 }
 
-Write-Log "=== Database initialization complete ===" 'Green'
+Write-Log '=== Database initialization complete ===' 'Green'
 Write-Log "Log file: $LogFile" 'Gray'
 
 $dbReady = [ordered]@{
-    database    = $DbName
-    server      = '127.0.0.1,1433'
-    service     = $sqlServiceName
-    instance    = $sqlInstanceName
+    type        = 'better-sqlite3'
+    dbPath      = $DbPath
     completedAt = (Get-Date).ToString('s')
 } | ConvertTo-Json -Depth 2
 $dbReady | Out-File -FilePath $DbReadyPath -Encoding utf8 -NoNewline
