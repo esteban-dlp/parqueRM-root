@@ -38,6 +38,9 @@ INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES ('ROL
 INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES ('ROLES_MANAGE', 'Administrar roles', 'Roles', 'Permite modificar roles y permisos');
 INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES ('AUDIT_READ', 'Ver auditoría', 'Auditoría', 'Permite consultar bitácora de auditoría');
 INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES ('TARIFF_OVERRIDE', 'Sobreescribir tarifa', 'Tarifas', 'Permite modificar manualmente el monto de tarifa aplicada en registros operativos');
+INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES ('SURVEYS_CONFIG_READ', 'Ver preguntas de encuesta', 'Encuestas', 'Permite consultar las preguntas configuradas de la encuesta de satisfacción');
+INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES ('SURVEYS_CONFIG_MANAGE', 'Administrar preguntas de encuesta', 'Encuestas', 'Permite crear, editar, activar/desactivar y reordenar preguntas de encuesta');
+INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES ('SURVEYS_REPORT_READ', 'Ver reporte de encuestas', 'Encuestas', 'Permite consultar el reporte agregado de respuestas de encuesta');
 
 INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
@@ -56,7 +59,7 @@ WHERE r.name = 'Operador de caja';
 INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.code IN ('VISITANTES_READ', 'VEHICULOS_READ', 'HOSPEDAJE_READ', 'RECEIPTS_READ', 'CAJA_READ', 'REPORTES_READ', 'CONFIG_READ', 'CATALOGS_READ')
+JOIN permissions p ON p.code IN ('VISITANTES_READ', 'VEHICULOS_READ', 'HOSPEDAJE_READ', 'RECEIPTS_READ', 'CAJA_READ', 'REPORTES_READ', 'CONFIG_READ', 'CATALOGS_READ', 'SURVEYS_REPORT_READ')
 WHERE r.name = 'Consulta';
 
 

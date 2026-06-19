@@ -107,6 +107,25 @@ DB_HOST=sqlserver
 
 No debe usar `localhost`, porque dentro del contenedor `localhost` sería el mismo contenedor del backend, no SQL Server.
 
+### `SEED_DEMO_DATA`
+
+Controla si el servicio `db-init` carga `db/init/07_seed_demo_data.sql` (visitantes,
+vehículos, hospedaje, recibos y movimientos de ejemplo) al inicializar una base nueva.
+
+```env
+SEED_DEMO_DATA=true   # incluye datos de ejemplo (default)
+SEED_DEMO_DATA=false  # instalación limpia, sin datos de ejemplo
+```
+
+Roles, permisos, el usuario administrador inicial, los catálogos técnicos
+(medios de pago, categorías de visitante, tipos de vehículo/hospedaje, etc.) y la
+configuración mínima del parque **siempre** se instalan, sin importar este valor.
+
+Los scripts `scripts/start.bat` y `scripts/reset-db.bat` preguntan por esta opción
+en la instalación inicial (o al reinstalar con `reset-db.bat`) y la guardan en `.env`.
+Solo tiene efecto sobre una base de datos nueva — no borra datos demo ya existentes
+en una base ya inicializada.
+
 ---
 
 ## Servicios del `docker-compose.yml`

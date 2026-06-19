@@ -221,6 +221,7 @@ Puede:
 - Ver reportes.
 - Ver configuración.
 - Ver catálogos.
+- Ver el reporte de encuestas.
 ```
 
 No puede:
@@ -235,6 +236,7 @@ No puede:
 - Administrar usuarios.
 - Administrar roles.
 - Exportar reportes.
+- Administrar preguntas de encuesta.
 ```
 
 Permisos asignados:
@@ -248,6 +250,7 @@ CAJA_READ
 REPORTES_READ
 CONFIG_READ
 CATALOGS_READ
+SURVEYS_REPORT_READ
 ```
 
 ---
@@ -357,6 +360,22 @@ ROLES_MANAGE           → Administrar roles y permisos
 ```txt
 AUDIT_READ             → Ver bitácora de auditoría
 ```
+
+---
+
+### Encuestas
+
+```txt
+SURVEYS_CONFIG_READ    → Ver preguntas configuradas de la encuesta de satisfacción
+SURVEYS_CONFIG_MANAGE  → Crear, editar, activar/desactivar y reordenar preguntas
+SURVEYS_REPORT_READ    → Ver el reporte agregado de respuestas de encuesta
+```
+
+Nota: la pantalla de captura de la encuesta (`POST /surveys/responses`,
+`GET /surveys/questions/active`) es pública/sin login — está pensada para un
+kiosco donde el visitante responde directamente, por lo que no requiere
+ningún permiso. La encuesta es anónima: no se guarda usuario, visitante ni
+ningún dato personal del encuestado.
 
 ---
 
