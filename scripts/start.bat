@@ -12,7 +12,17 @@ if exist .env (
     findstr /B "SEED_DEMO_DATA=" .env >nul 2>&1
     if errorlevel 1 (
         echo.
-        choice /C SN /M "¿Instalar con datos de ejemplo (visitantes, vehiculos, recibos demo)?"
+        echo ============================================================
+        echo  DATOS DE EJEMPLO (DEMO)
+        echo ============================================================
+        echo  S = Instalar con datos demo (visitantes, vehiculos, recibos
+        echo      de muestra para probar el sistema).
+        echo  N = Instalacion limpia de produccion (sin datos de ejemplo;
+        echo      solo se cargan usuarios, roles, permisos y catalogos
+        echo      necesarios para que el sistema funcione).
+        echo ============================================================
+        echo.
+        choice /C SN /M "¿Instalar con datos de ejemplo?"
         if errorlevel 2 (
             powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0set-seed-demo-data.ps1" -Value false
         ) else (

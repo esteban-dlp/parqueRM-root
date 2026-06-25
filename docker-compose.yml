@@ -29,6 +29,22 @@ services:
       fi &&
       sqlite3 /data/parquerm.db < /init/08_patch_park_config_sidebar_color_hex.sql &&
       sqlite3 /data/parquerm.db < /init/09_patch_tickets_and_services.sql &&
+      HAS_HEALTH_COL=$$(sqlite3 /data/parquerm.db \"SELECT COUNT(*) FROM pragma_table_info('visitor_records') WHERE name='has_medication_allergy'\") &&
+      if [ \"$$HAS_HEALTH_COL\" = \"0\" ]; then
+        echo 'Aplicando migracion 004 (campos de salud visitante)...' &&
+        sqlite3 /data/parquerm.db < /migrations/004_add_visitor_health_fields.sql;
+      else
+        sqlite3 /data/parquerm.db \"INSERT OR IGNORE INTO schema_migrations (migration_name) VALUES ('004_add_visitor_health_fields');\" &&
+        echo 'Migracion 004: columnas de salud ya presentes.';
+      fi &&
+      HAS_RESET_PERM=$$(sqlite3 /data/parquerm.db \"SELECT COUNT(*) FROM permissions WHERE code='PLATFORM_DATA_RESET'\") &&
+      if [ \"$$HAS_RESET_PERM\" = \"0\" ]; then
+        echo 'Aplicando migracion 005 (permiso PLATFORM_DATA_RESET)...' &&
+        sqlite3 /data/parquerm.db < /migrations/005_add_platform_data_reset_permission.sql;
+      else
+        sqlite3 /data/parquerm.db \"INSERT OR IGNORE INTO schema_migrations (migration_name) VALUES ('005_add_platform_data_reset_permission');\" &&
+        echo 'Migracion 005: permiso PLATFORM_DATA_RESET ya presente.';
+      fi &&
       SYSTEM_LAN_URL_ESCAPED=$$(printf '%s' \"$$SYSTEM_LAN_URL\" | sed \"s/'/''/g\") &&
       sqlite3 /data/parquerm.db \"UPDATE park_config SET system_lan_url = '$$SYSTEM_LAN_URL_ESCAPED', updated_at = CURRENT_TIMESTAMP;\" &&
       echo 'Base SQLite inicializada correctamente.'

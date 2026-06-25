@@ -41,6 +41,7 @@ INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES ('TAR
 INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES ('SURVEYS_CONFIG_READ', 'Ver preguntas de encuesta', 'Encuestas', 'Permite consultar las preguntas configuradas de la encuesta de satisfacción');
 INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES ('SURVEYS_CONFIG_MANAGE', 'Administrar preguntas de encuesta', 'Encuestas', 'Permite crear, editar, activar/desactivar y reordenar preguntas de encuesta');
 INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES ('SURVEYS_REPORT_READ', 'Ver reporte de encuestas', 'Encuestas', 'Permite consultar el reporte agregado de respuestas de encuesta');
+INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES ('PLATFORM_DATA_RESET', 'Eliminar datos de la plataforma', 'Sistema', 'Permite ejecutar el borrado masivo de datos operativos ingresados manualmente');
 
 INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id

@@ -379,6 +379,30 @@ ningún dato personal del encuestado.
 
 ---
 
+### Sistema
+
+```txt
+PLATFORM_DATA_RESET    → Ejecutar borrado masivo de datos operativos de la plataforma
+```
+
+Este permiso solo debe asignarse al rol **Administrador**. Permite usar el flujo de reset
+de dos pasos (`/system/data-reset/prepare` + `/system/data-reset/execute`) que elimina
+permanentemente datos operativos (visitantes, vehículos, hospedaje, recibos, caja,
+encuestas respondidas). No elimina catálogos, tarifas, usuarios, roles, permisos ni
+configuración del parque.
+
+El flujo exige triple confirmación:
+1. Modal de advertencia con texto de responsabilidad.
+2. Escribir exactamente `ELIMINAR`.
+3. Ingresar la contraseña del administrador (validada con bcrypt en el backend).
+
+El backend genera un nonce de un solo uso con TTL de 5 minutos. Toda la operación queda
+registrada en `audit_logs` con acción `DATA_RESET_EXECUTE_COMPLETE`.
+
+Roles con este permiso: **Administrador**.
+
+---
+
 ## Validación en backend
 
 Cada endpoint sensible debe protegerse con JWT y permisos.
@@ -453,6 +477,9 @@ GET    /roles                       → ROLES_READ
 PATCH  /roles/:id/permissions       → ROLES_MANAGE
 
 GET    /audit-logs                  → AUDIT_READ
+
+POST   /system/data-reset/prepare   → PLATFORM_DATA_RESET
+POST   /system/data-reset/execute   → PLATFORM_DATA_RESET
 ```
 
 ---
