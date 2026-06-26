@@ -392,13 +392,19 @@ CREATE INDEX IF NOT EXISTS ix_receipts_status ON receipts(status);
 CREATE TABLE IF NOT EXISTS receipt_lines (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     receipt_id INTEGER NOT NULL,
+    concept_id INTEGER NULL,
+    origin_type TEXT NULL,
+    origin_id INTEGER NULL,
     description TEXT NOT NULL,
     quantity NUMERIC NOT NULL DEFAULT 1,
     unit_price NUMERIC NOT NULL,
     total NUMERIC NOT NULL,
-    CONSTRAINT fk_receipt_lines_receipt FOREIGN KEY (receipt_id) REFERENCES receipts(id)
+    CONSTRAINT fk_receipt_lines_receipt FOREIGN KEY (receipt_id) REFERENCES receipts(id),
+    CONSTRAINT fk_receipt_lines_concept FOREIGN KEY (concept_id) REFERENCES financial_concepts(id)
 );
 CREATE INDEX IF NOT EXISTS ix_receipt_lines_receipt_id ON receipt_lines(receipt_id);
+CREATE INDEX IF NOT EXISTS ix_receipt_lines_origin ON receipt_lines(origin_type, origin_id);
+CREATE INDEX IF NOT EXISTS ix_receipt_lines_concept_id ON receipt_lines(concept_id);
 
 /* =========================
    CAJA

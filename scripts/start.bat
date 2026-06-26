@@ -33,9 +33,14 @@ if exist .env (
 
 docker compose up -d --build
 
+set FRONTEND_PORT=8080
+if exist .env (
+    for /F "tokens=2 delims==" %%A in ('findstr /B "FRONTEND_PORT=" .env') do set FRONTEND_PORT=%%A
+)
+
 echo.
 echo Sistema iniciado.
-echo Frontend: http://localhost
+echo Frontend: http://localhost:%FRONTEND_PORT%
 echo Backend:  http://localhost:3000/api
 echo SQL:      localhost,1433
 echo.

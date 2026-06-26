@@ -18,6 +18,7 @@ INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES ('VEH
 INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES ('VEHICULOS_ENABLE_EXIT', 'Habilitar salida de vehículos', 'Vehículos', 'Permite marcar vehículos como habilitados para salir');
 INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES ('HOSPEDAJE_CREATE', 'Crear hospedaje', 'Hospedaje', 'Permite registrar cobros de hospedaje');
 INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES ('HOSPEDAJE_READ', 'Ver hospedaje', 'Hospedaje', 'Permite consultar registros de hospedaje');
+INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES ('HOSPEDAJE_UPDATE', 'Editar hospedaje', 'Hospedaje', 'Permite actualizar registros de hospedaje');
 INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES ('RECEIPTS_CREATE', 'Crear recibos', 'Recibos', 'Permite emitir recibos');
 INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES ('RECEIPTS_READ', 'Ver recibos', 'Recibos', 'Permite consultar recibos');
 INSERT OR IGNORE INTO permissions (code, name, module, description) VALUES ('RECEIPTS_CANCEL', 'Anular recibos', 'Recibos', 'Permite anular recibos');
@@ -53,7 +54,7 @@ WHERE r.name = 'Administrador';
 INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.code IN ('VISITANTES_CREATE', 'VISITANTES_READ', 'VISITANTES_CHECKOUT', 'VEHICULOS_CREATE', 'VEHICULOS_READ', 'VEHICULOS_ENABLE_EXIT', 'HOSPEDAJE_CREATE', 'HOSPEDAJE_READ', 'RECEIPTS_CREATE', 'RECEIPTS_READ', 'RECEIPTS_PRINT', 'CAJA_CREATE_MOVEMENT', 'CAJA_READ', 'REPORTES_READ', 'CONFIG_READ', 'CATALOGS_READ')
+JOIN permissions p ON p.code IN ('VISITANTES_CREATE', 'VISITANTES_READ', 'VISITANTES_CHECKOUT', 'VEHICULOS_CREATE', 'VEHICULOS_READ', 'VEHICULOS_ENABLE_EXIT', 'HOSPEDAJE_CREATE', 'HOSPEDAJE_READ', 'HOSPEDAJE_UPDATE', 'RECEIPTS_CREATE', 'RECEIPTS_READ', 'RECEIPTS_PRINT', 'CAJA_CREATE_MOVEMENT', 'CAJA_READ', 'REPORTES_READ', 'CONFIG_READ', 'CATALOGS_READ')
 WHERE r.name = 'Operador de caja';
 
 

@@ -20,6 +20,7 @@ services:
       sqlite3 /data/parquerm.db < /init/03_seed_security.sql &&
       sqlite3 /data/parquerm.db < /init/03a_repair_utf8_seed_text.sql &&
       sqlite3 /data/parquerm.db < /init/04_seed_catalogs.sql &&
+      sqlite3 /data/parquerm.db < /init/04a_seed_municipalities.sql &&
       sqlite3 /data/parquerm.db < /init/05_seed_tariffs.sql &&
       sqlite3 /data/parquerm.db < /init/06_seed_park_config.sql &&
       if [ \"$$SEED_DEMO_DATA\" = \"true\" ]; then
@@ -44,6 +45,14 @@ services:
       else
         sqlite3 /data/parquerm.db \"INSERT OR IGNORE INTO schema_migrations (migration_name) VALUES ('005_add_platform_data_reset_permission');\" &&
         echo 'Migracion 005: permiso PLATFORM_DATA_RESET ya presente.';
+      fi &&
+      HAS_RECEIPT_LINE_ORIGIN=$$(sqlite3 /data/parquerm.db \"SELECT COUNT(*) FROM pragma_table_info('receipt_lines') WHERE name='origin_type'\") &&
+      if [ \"$$HAS_RECEIPT_LINE_ORIGIN\" = \"0\" ]; then
+        echo 'Aplicando migracion 006 (origen/concepto por linea de ticket)...' &&
+        sqlite3 /data/parquerm.db < /migrations/006_add_receipt_line_origin_fields.sql;
+      else
+        sqlite3 /data/parquerm.db \"INSERT OR IGNORE INTO schema_migrations (migration_name) VALUES ('006_add_receipt_line_origin_fields.sql');\" &&
+        echo 'Migracion 006: columnas de lineas de ticket ya presentes.';
       fi &&
       SYSTEM_LAN_URL_ESCAPED=$$(printf '%s' \"$$SYSTEM_LAN_URL\" | sed \"s/'/''/g\") &&
       sqlite3 /data/parquerm.db \"UPDATE park_config SET system_lan_url = '$$SYSTEM_LAN_URL_ESCAPED', updated_at = CURRENT_TIMESTAMP;\" &&
@@ -70,6 +79,8 @@ services:
       JWT_SECRET: "${JWT_SECRET}"
       JWT_REFRESH_SECRET: "${JWT_REFRESH_SECRET}"
 
+      SYSTEM_LAN_URL: "${SYSTEM_LAN_URL:-}"
+      FRONTEND_PORT: "${FRONTEND_PORT:-80}"
       UPLOADS_PATH: /app/uploads
     ports:
       - "${BACKEND_PORT}:3000"

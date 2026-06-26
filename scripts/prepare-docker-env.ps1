@@ -10,7 +10,8 @@
 #>
 param(
     [string]$EnvPath = '',
-    [string]$FallbackUrl = 'http://192.168.1.10'
+    [string]$FallbackUrl = 'http://192.168.1.10',
+    [string]$FrontendPort = ''
 )
 
 Set-StrictMode -Version Latest
@@ -74,9 +75,6 @@ function Get-LanIp {
     return $candidates[0].IP
 }
 
-$ip = Get-LanIp
-$systemLanUrl = if ([string]::IsNullOrWhiteSpace($ip)) { $FallbackUrl } else { "http://$ip" }
-
 $envDir = Split-Path $EnvPath -Parent
 if (-not (Test-Path $envDir)) { New-Item -ItemType Directory -Path $envDir -Force | Out-Null }
 
@@ -84,6 +82,42 @@ $lines = @()
 if (Test-Path $EnvPath) {
     $lines = @(Get-Content $EnvPath)
 }
+
+function Get-EnvLineValue([string]$Name) {
+    foreach ($line in $lines) {
+        if ($line -match "^$([regex]::Escape($Name))=(.*)$") {
+            return $Matches[1].Trim()
+        }
+    }
+    return ''
+}
+
+function Add-PortIfNeeded([string]$Url, [string]$Port) {
+    $cleanUrl = $Url.TrimEnd('/')
+    if ([string]::IsNullOrWhiteSpace($Port)) { return $cleanUrl }
+    if ($Port -eq '80' -or $Port -eq '443') { return $cleanUrl }
+
+    $portNumber = 0
+    if (-not [int]::TryParse($Port, [ref]$portNumber)) { return $cleanUrl }
+    if ($portNumber -le 0) { return $cleanUrl }
+
+    try {
+        $uri = [uri]$cleanUrl
+        if (-not $uri.IsDefaultPort) { return $cleanUrl }
+        $builder = [System.UriBuilder]::new($uri)
+        $builder.Port = $portNumber
+        return $builder.Uri.AbsoluteUri.TrimEnd('/')
+    } catch {
+        return $cleanUrl
+    }
+}
+
+$resolvedFrontendPort = if ([string]::IsNullOrWhiteSpace($FrontendPort)) { Get-EnvLineValue 'FRONTEND_PORT' } else { $FrontendPort }
+if ([string]::IsNullOrWhiteSpace($resolvedFrontendPort)) { $resolvedFrontendPort = '8080' }
+
+$ip = Get-LanIp
+$baseSystemLanUrl = if ([string]::IsNullOrWhiteSpace($ip)) { $FallbackUrl } else { "http://$ip" }
+$systemLanUrl = Add-PortIfNeeded $baseSystemLanUrl $resolvedFrontendPort
 
 $updated = $false
 for ($i = 0; $i -lt $lines.Count; $i++) {
