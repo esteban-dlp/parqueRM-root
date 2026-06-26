@@ -26,8 +26,55 @@ param(
     [string]$RuntimeDir  = ''
 )
 
+# --- Logging setup (before StrictMode so $script:LogFile is always defined) ---
+$script:LogFile = $null
+try {
+    $logServicesDir = Join-Path $InstallDir 'logs\services'
+    if (-not (Test-Path $logServicesDir)) {
+        New-Item -ItemType Directory -Path $logServicesDir -Force | Out-Null
+    }
+    $script:LogFile = Join-Path $logServicesDir ("install-services-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + ".log")
+    Add-Content -Path $script:LogFile -Value "=== install-services.ps1 started $(Get-Date) ===" -Encoding utf8
+} catch {
+    # Log dir creation failed; fall back to desktop
+    $script:LogFile = Join-Path ([Environment]::GetFolderPath('Desktop')) 'parquerm-install-services.log'
+    try { Add-Content -Path $script:LogFile -Value "=== install-services.ps1 started $(Get-Date) (log-dir fallback) ===" -Encoding utf8 } catch {}
+}
+
+function Write-Log {
+    param([string]$Message, [string]$Color = 'White')
+    $line = "[$(Get-Date -Format 'HH:mm:ss')] $Message"
+    Write-Host $line -ForegroundColor $Color
+    try { Add-Content -Path $script:LogFile -Value $line -Encoding utf8 } catch {}
+}
+
+function Invoke-WinSwCommand {
+    param([string]$ExePath, [string]$Command, [string]$ServiceId)
+    Write-Log "  WinSW ${Command}: $ExePath" 'Gray'
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $rawOutput = & $ExePath $Command 2>&1
+        $exit = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
+    $outLines = @($rawOutput | ForEach-Object { "$_" } | Where-Object { $_ })
+    if ($outLines.Count -gt 0) {
+        $outLines | ForEach-Object { Write-Log "    [WinSW $Command] $_" 'Gray' }
+    }
+    return $exit
+}
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# Global trap: log any unhandled terminating error
+trap {
+    $errMsg = "UNHANDLED ERROR: $($_.Exception.Message)`nAt: $($_.InvocationInfo.PositionMessage)"
+    Write-Log $errMsg 'Red'
+    exit 1
+}
 
 if ([string]::IsNullOrWhiteSpace($RuntimeDir)) { $RuntimeDir = Join-Path $InstallDir 'runtime' }
 
@@ -42,19 +89,24 @@ $UploadsDir   = Join-Path $InstallDir 'data\uploads'
 $DbReadyPath  = Join-Path $ConfigDir 'db-ready.json'
 $ExistingCoreDnsService = Get-Service -Name 'ParqueRMDns' -ErrorAction SilentlyContinue
 
+Write-Log "InstallDir : $InstallDir" 'Gray'
+Write-Log "RuntimeDir : $RuntimeDir" 'Gray'
+Write-Log "LogFile    : $script:LogFile" 'Gray'
+
 foreach ($d in @($LogBackend, $LogFrontend, $LogNetwork, $ServicesDir, (Join-Path $UploadsDir 'logos'))) {
     if (-not (Test-Path $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
 }
 
 if (-not (Test-Path $DbReadyPath)) {
+    Write-Log "ERROR: db-ready.json missing at $DbReadyPath" 'Red'
     Write-Error "Database initialization did not complete successfully. Missing marker: $DbReadyPath. Check $InstallDir\logs\db-init\ before installing services."
     exit 1
 }
+Write-Log "db-ready.json found." 'Green'
 
 # --- Locate WinSW -------------------------------------------------------------
 $winsw = Join-Path $RuntimeDir 'winsw\WinSW.exe'
 if (-not (Test-Path $winsw)) {
-    # Try alternate names
     $altNames = @('WinSW-x64.exe', 'winsw.exe', 'WinSW64.exe')
     foreach ($alt in $altNames) {
         $candidate = Join-Path $RuntimeDir "winsw\$alt"
@@ -62,10 +114,17 @@ if (-not (Test-Path $winsw)) {
     }
 }
 if (-not (Test-Path $winsw)) {
+    Write-Log "ERROR: WinSW not found in $RuntimeDir\winsw\" 'Red'
+    $found = @(Get-ChildItem (Join-Path $RuntimeDir 'winsw') -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name)
+    Write-Log "  Contents of winsw dir: $($found -join ', ')" 'Yellow'
     Write-Error "WinSW not found at $RuntimeDir\winsw\. Place WinSW.exe there."
     exit 1
 }
-Write-Host "Using WinSW: $winsw" -ForegroundColor Gray
+Write-Log "WinSW : $winsw" 'Gray'
+try {
+    $winswVer = (& $winsw --version 2>&1 | Select-Object -First 1)
+    Write-Log "WinSW version: $winswVer" 'Gray'
+} catch { Write-Log "WinSW version check skipped." 'Gray' }
 
 # --- Locate Node.js -----------------------------------------------------------
 $nodePath = Join-Path $RuntimeDir 'node\node.exe'
@@ -73,20 +132,22 @@ if (-not (Test-Path $nodePath)) {
     $sysNodeCmd = Get-Command node -ErrorAction SilentlyContinue
     $sysNode = if ($sysNodeCmd) { $sysNodeCmd.Source } else { $null }
     if ($sysNode) { $nodePath = $sysNode } else {
+        Write-Log "ERROR: node.exe not found." 'Red'
         Write-Error "node.exe not found in $RuntimeDir\node\ and not in PATH."
         exit 1
     }
 }
 $nodeDir = Split-Path $nodePath -Parent
-Write-Host "Using Node: $nodePath" -ForegroundColor Gray
+Write-Log "Node  : $nodePath" 'Gray'
 
 # --- Locate Caddy -------------------------------------------------------------
 $caddyPath = Join-Path $RuntimeDir 'caddy\caddy.exe'
 if (-not (Test-Path $caddyPath)) {
+    Write-Log "ERROR: caddy.exe not found at $RuntimeDir\caddy\" 'Red'
     Write-Error "caddy.exe not found at $RuntimeDir\caddy\. Place caddy.exe there."
     exit 1
 }
-Write-Host "Using Caddy: $caddyPath" -ForegroundColor Gray
+Write-Log "Caddy : $caddyPath" 'Gray'
 
 # --- Caddyfile ----------------------------------------------------------------
 $caddyFile = Join-Path $InstallDir 'config\Caddyfile'
@@ -112,7 +173,7 @@ $caddyContent = @"
 }
 "@
 $caddyContent | Out-File -FilePath $caddyFile -Encoding utf8
-Write-Host "  Wrote Caddyfile: $caddyFile" -ForegroundColor Green
+Write-Log "Caddyfile written: $caddyFile" 'Green'
 
 # --- Helper: install one WinSW service ---------------------------------------
 function ConvertTo-XmlEscaped([AllowNull()][string]$Value) {
@@ -175,42 +236,44 @@ $envXml</service>
 "@
     $xmlContent | Out-File -FilePath $xmlPath -Encoding utf8
 
+    Write-Log "  XML path : $xmlPath" 'Gray'
+    Write-Log "  Exe path : $exePath" 'Gray'
+    Write-Log "  Executable: $xmlExecutable" 'Gray'
+    Write-Log "  Arguments : $Arguments" 'Gray'
+    Write-Log "  WorkingDir: $xmlWorkingDir" 'Gray'
+
     # Check if already installed
     $existing = Get-Service -Name $ServiceId -ErrorAction SilentlyContinue
     if ($existing) {
-        Write-Host "  [UPDATE] $DisplayName -- re-installing" -ForegroundColor Yellow
+        Write-Log "  [UPDATE] $DisplayName -- re-installing" 'Yellow'
         if ($existing.Status -ne 'Stopped') {
             Stop-Service -Name $ServiceId -Force -ErrorAction SilentlyContinue
             Start-Sleep -Seconds 2
         }
-        # WinSW often writes status text to stderr even on success. With
-        # $ErrorActionPreference = 'Stop', a bare "2>&1" would turn that into a
-        # terminating error before "uninstall" finishes, so relax it here.
-        $previousErrorActionPreference = $ErrorActionPreference
-        $ErrorActionPreference = 'Continue'
-        try {
-            & $exePath uninstall 2>&1 | Out-Null
-        } finally {
-            $ErrorActionPreference = $previousErrorActionPreference
-        }
+        $uninstExit = Invoke-WinSwCommand $exePath 'uninstall' $ServiceId
+        Write-Log "  WinSW uninstall exit code: $uninstExit" 'Gray'
         Start-Sleep -Seconds 2
     }
 
-    & $exePath install
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "Failed to install service: $DisplayName"
+    $instExit = Invoke-WinSwCommand $exePath 'install' $ServiceId
+    Write-Log "  WinSW install exit code: $instExit" 'Gray'
+    if ($instExit -ne 0) {
+        Write-Log "ERROR: WinSW install failed for $DisplayName (exit $instExit)" 'Red'
+        Write-Error "Failed to install service: $DisplayName (WinSW exit $instExit)"
         exit 1
     }
-    Write-Host "  [OK] $DisplayName installed" -ForegroundColor Green
+    Write-Log "  [OK] $DisplayName installed" 'Green'
 }
 
 # --- Backend service ----------------------------------------------------------
-Write-Host "`nInstalling ParqueRM Backend service..." -ForegroundColor Cyan
+Write-Log "`nInstalling ParqueRM Backend service..." 'Cyan'
 $backendMain = Join-Path $BackendDir 'dist\main.js'
 if (-not (Test-Path $backendMain)) {
+    Write-Log "ERROR: Backend dist not found at $backendMain" 'Red'
     Write-Error "Backend dist not found at $backendMain. Run 'npm run build' first."
     exit 1
 }
+Write-Log "Backend main.js found: $backendMain" 'Gray'
 
 Install-WinSwService `
     -ServiceId    'ParqueRMBackend' `
@@ -226,7 +289,7 @@ Install-WinSwService `
 # The .env is loaded by the backend via @nestjs/config dotenv support
 
 # --- Frontend service ---------------------------------------------------------
-Write-Host "`nInstalling ParqueRM Frontend service..." -ForegroundColor Cyan
+Write-Log "`nInstalling ParqueRM Frontend service..." 'Cyan'
 
 Install-WinSwService `
     -ServiceId    'ParqueRMFrontend' `
@@ -238,12 +301,14 @@ Install-WinSwService `
     -LogDir       $LogFrontend
 
 # --- Local name responder service --------------------------------------------
-Write-Host "`nInstalling ParqueRM Local Name service..." -ForegroundColor Cyan
+Write-Log "`nInstalling ParqueRM Local Name service..." 'Cyan'
 $localNameScript = Join-Path $InstallDir 'tools\installer-scripts\local-name-responder.ps1'
 if (-not (Test-Path $localNameScript)) {
+    Write-Log "ERROR: local-name-responder.ps1 not found at $localNameScript" 'Red'
     Write-Error "Local name responder script not found at $localNameScript."
     exit 1
 }
+Write-Log "local-name-responder.ps1 found." 'Gray'
 
 Install-WinSwService `
     -ServiceId    'ParqueRMLocalName' `
@@ -255,7 +320,7 @@ Install-WinSwService `
     -LogDir       $LogNetwork
 
 # --- Start services -----------------------------------------------------------
-Write-Host "`nStarting services..." -ForegroundColor Cyan
+Write-Log "`nStarting services..." 'Cyan'
 
 function Start-ParqueService {
     param([string]$ServiceId)
@@ -270,7 +335,7 @@ function Start-ParqueService {
             return
         }
 
-        Write-Host "  Starting $ServiceId (attempt $attempt/3)..." -ForegroundColor Yellow
+        Write-Log "  Starting $ServiceId (attempt $attempt/3)..." 'Yellow'
         try {
             Start-Service -Name $ServiceId -ErrorAction Stop
         } catch {
@@ -297,8 +362,10 @@ function Start-ParqueService {
     }
 
     if ($lastError) {
+        Write-Log "ERROR: $ServiceId did not start. Last error: $lastError" 'Red'
         Write-Error "Service $ServiceId did not start. Last error: $lastError"
     } else {
+        Write-Log "ERROR: $ServiceId did not start." 'Red'
         Write-Error "Service $ServiceId did not start."
     }
     exit 1
@@ -327,6 +394,7 @@ function Wait-HttpOk {
         Start-Sleep -Seconds 3
     }
 
+    Write-Log "ERROR: $Name did not respond at $Url. Last error: $lastError" 'Red'
     Write-Error "$Name did not respond at $Url. Last error: $lastError"
     exit 1
 }
@@ -368,16 +436,19 @@ if ($ExistingCoreDnsService) {
 foreach ($svcName in @('ParqueRMBackend', 'ParqueRMFrontend', 'ParqueRMLocalName')) {
     $svc = Get-Service -Name $svcName -ErrorAction Stop
     if ($svc.Status -ne 'Running') {
+        Write-Log "ERROR: $svcName did not stay Running. Status: $($svc.Status)" 'Red'
         Write-Error "Service $svcName did not stay Running. Current status: $($svc.Status)"
         exit 1
     }
+    Write-Log "  [OK] $svcName is Running" 'Green'
 }
 
-Write-Host ""
-Write-Host "Services installed and started." -ForegroundColor Green
-Write-Host "  Backend  : ParqueRMBackend" -ForegroundColor White
-Write-Host "  Frontend : ParqueRMFrontend" -ForegroundColor White
-Write-Host "  Local    : ParqueRMLocalName" -ForegroundColor White
+Write-Log "" 'White'
+Write-Log "Services installed and started." 'Green'
+Write-Log "  Backend  : ParqueRMBackend" 'White'
+Write-Log "  Frontend : ParqueRMFrontend" 'White'
+Write-Log "  Local    : ParqueRMLocalName" 'White'
 if ($ExistingCoreDnsService) {
-    Write-Host "  Legacy DNS preserved: ParqueRMDns" -ForegroundColor Gray
+    Write-Log "  Legacy DNS preserved: ParqueRMDns" 'Gray'
 }
+Write-Log "Log: $script:LogFile" 'Gray'

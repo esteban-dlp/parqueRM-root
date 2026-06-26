@@ -18,9 +18,6 @@ PRAGMA busy_timeout = 5000;
 
 BEGIN TRANSACTION;
 
-INSERT INTO schema_migrations (migration_name)
-VALUES ('005_add_platform_data_reset_permission');
-
 INSERT OR IGNORE INTO permissions (code, name, module, description)
 VALUES ('PLATFORM_DATA_RESET', 'Eliminar datos de la plataforma', 'Sistema',
         'Permite ejecutar el borrado masivo de datos operativos ingresados manualmente');

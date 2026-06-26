@@ -100,9 +100,48 @@ function Invoke-SqliteQuery([string]$Sql) {
     return @(Invoke-SqliteChecked -Arguments @($DbPath, '-batch', '-noheader', $Sql) -FailureMessage 'SQLite query failed.')
 }
 
-function Invoke-SqliteFile([string]$FilePath) {
+function Test-SqliteColumnExists([string]$Table, [string]$Column) {
+    $escapedTable  = $Table.Replace("'", "''")
+    $escapedColumn = $Column.Replace("'", "''")
+    $rows = @(Invoke-SqliteQuery "SELECT name FROM pragma_table_info('$escapedTable') WHERE name='$escapedColumn';")
+    return (@($rows | Where-Object { $_.Trim() -eq $Column }).Count -gt 0)
+}
+
+function Invoke-MigrationFile([string]$FilePath) {
     $fileName = Split-Path $FilePath -Leaf
-    Invoke-SqliteChecked -Arguments @($DbPath, '-batch', ".read $FilePath") -FailureMessage "Migration failed: $fileName." | Out-Null
+    $lines = @(Get-Content $FilePath -Encoding UTF8)
+    $batchLines = [System.Collections.Generic.List[string]]::new()
+
+    foreach ($line in $lines) {
+        $trimmed = $line.Trim()
+        if ($trimmed -match '(?i)^ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)\s+(.+)$') {
+            $batchSql = ($batchLines -join "`n").Trim()
+            if ($batchSql) {
+                Invoke-SqliteChecked -Arguments @($DbPath, '-batch', '-noheader', $batchSql) `
+                    -FailureMessage "Migration failed: $fileName" | Out-Null
+            }
+            $batchLines.Clear()
+
+            $table  = $Matches[1]
+            $column = $Matches[2]
+            $colDef = $Matches[3].TrimEnd(';').Trim()
+
+            if (Test-SqliteColumnExists $table $column) {
+                Write-Host "    [SKIP] $table.$column -- column already exists" -ForegroundColor Gray
+            } else {
+                Invoke-SqliteQuery "ALTER TABLE $table ADD COLUMN $column $colDef;" | Out-Null
+                Write-Host "    [ADD]  $table.$column" -ForegroundColor Green
+            }
+        } else {
+            [void]$batchLines.Add($line)
+        }
+    }
+
+    $batchSql = ($batchLines -join "`n").Trim()
+    if ($batchSql) {
+        Invoke-SqliteChecked -Arguments @($DbPath, '-batch', '-noheader', $batchSql) `
+            -FailureMessage "Migration failed: $fileName" | Out-Null
+    }
 }
 
 Write-Host "Ensuring schema_migrations table exists..." -ForegroundColor Cyan
@@ -120,7 +159,13 @@ $applied = @{}
 $rows = @(Invoke-SqliteQuery "SELECT migration_name FROM schema_migrations;")
 foreach ($row in $rows) {
     $name = $row.Trim()
-    if ($name) { $applied[$name] = $true }
+    if ($name) {
+        $applied[$name] = $true
+        $nameWithoutExt = [IO.Path]::GetFileNameWithoutExtension($name)
+        if ($nameWithoutExt -and $nameWithoutExt -ne $name) {
+            $applied[$nameWithoutExt] = $true
+        }
+    }
 }
 
 $files = @(Get-ChildItem -Path $MigrationsDir -Filter '*.sql' -File -ErrorAction SilentlyContinue | Sort-Object Name)
@@ -137,14 +182,15 @@ $skippedCount = 0
 foreach ($file in $files) {
     $name = $file.Name
 
-    if ($applied.ContainsKey($name)) {
+    $nameWithoutExt = [IO.Path]::GetFileNameWithoutExtension($name)
+    if ($applied.ContainsKey($name) -or $applied.ContainsKey($nameWithoutExt)) {
         Write-Host "  [SKIP]    $name -- already applied" -ForegroundColor Gray
         $skippedCount++
         continue
     }
 
     Write-Host "  [RUNNING] $name ..." -ForegroundColor Yellow
-    Invoke-SqliteFile $file.FullName
+    Invoke-MigrationFile $file.FullName
 
     $escapedName = $name.Replace("'", "''")
     Invoke-SqliteQuery "INSERT INTO schema_migrations (migration_name) VALUES ('$escapedName');" | Out-Null

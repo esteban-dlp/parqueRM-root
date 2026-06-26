@@ -162,24 +162,25 @@ if ($SkipRuntimeValidation) {
     Log '  [SKIP] -SkipRuntimeValidation passed' 'Yellow'
 } else {
     $required = @(
-        @{ Path = 'node';             Desc = 'Node.js Windows portable/installer (node.exe or node-vX.X.X-win-x64.zip)' },
-        @{ Path = 'caddy';            Desc = 'Caddy Windows binary (caddy.exe)' },
-        @{ Path = 'winsw';            Desc = 'WinSW service wrapper (WinSW.exe or WinSW-x64.exe)' },
-        @{ Path = 'sqlite';           Desc = 'SQLite command-line tools (sqlite3.exe)' }
+        @{ Path = 'node';   Desc = 'Node.js portable (node.exe)';                           ExeNames = @('node.exe') },
+        @{ Path = 'caddy';  Desc = 'Caddy Windows binary (caddy.exe)';                       ExeNames = @('caddy.exe') },
+        @{ Path = 'winsw';  Desc = 'WinSW service wrapper (WinSW-x64.exe or WinSW.exe)';    ExeNames = @('WinSW-x64.exe', 'WinSW.exe', 'winsw.exe', 'WinSW64.exe') },
+        @{ Path = 'sqlite'; Desc = 'SQLite command-line tools (sqlite3.exe)';                ExeNames = @('sqlite3.exe') }
     )
 
     $missing = @()
     foreach ($req in $required) {
         $fullPath = Join-Path $RuntimeCache $req.Path
-        $hasFiles = (Test-Path $fullPath) -and (
-            (Get-ChildItem $fullPath -Recurse -File -ErrorAction SilentlyContinue |
-             Where-Object { $_.Name -ne '.gitkeep' }).Count -gt 0
+        $exeFiles = @(
+            Get-ChildItem $fullPath -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { $req.ExeNames -contains $_.Name }
         )
-        if (-not $hasFiles) {
+        $hasExe = (Test-Path $fullPath) -and ($exeFiles.Count -gt 0)
+        if (-not $hasExe) {
             $missing += "  MISSING: installer\runtime-cache\$($req.Path)\ -- $($req.Desc)"
-            Log "  [MISSING] runtime-cache\$($req.Path)" 'Red'
+            Log "  [MISSING] runtime-cache\$($req.Path)\ (need: $($req.ExeNames -join ' or '))" 'Red'
         } else {
-            Log "  [OK] runtime-cache\$($req.Path)" 'Green'
+            Log "  [OK] runtime-cache\$($req.Path)\$($exeFiles[0].Name)" 'Green'
         }
     }
 
@@ -266,11 +267,71 @@ if ($SkipNpmInstall) {
     } else {
         Log "  [WARN] No dist/ found at $BackendDir\dist -- artifact copy will be skipped" 'Yellow'
     }
+
+    # ABI check even when skipping npm (the modules may be stale)
+    $runtimeNodeExe = Join-Path $RuntimeCache 'node\node.exe'
+    if (Test-Path $runtimeNodeExe) {
+        $runtimeAbi     = & $runtimeNodeExe -e "process.stdout.write(String(process.versions.modules))" 2>$null
+        $runtimeVersion = & $runtimeNodeExe --version 2>$null
+        $bindingPath    = Join-Path $BackendDir 'node_modules\better-sqlite3\build\Release\better_sqlite3.node'
+        if (Test-Path $bindingPath) {
+            Push-Location $BackendDir
+            $checkJs = "try{require('./node_modules/better-sqlite3/build/Release/better_sqlite3.node');process.stdout.write('ok')}catch(e){process.stdout.write('err:'+e.message.split('\n')[0])}"
+            $prevEap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+            $chkOut  = & $runtimeNodeExe -e $checkJs 2>$null
+            $ErrorActionPreference = $prevEap
+            Pop-Location
+
+            if ($chkOut -eq 'ok') {
+                Log "  [OK] better-sqlite3 ABI matches runtime $runtimeVersion (ABI $runtimeAbi)" 'Green'
+            } else {
+                Log "[ERROR] Native module ABI MISMATCH (even with -SkipNpmInstall)!" 'Red'
+                Log "  Runtime Node : $runtimeVersion  (ABI $runtimeAbi)" 'Yellow'
+                Log "  Error: $chkOut" 'Yellow'
+                Log "  Fix: Run without -SkipNpmInstall so npm rebuilds native modules." 'Yellow'
+                exit 1
+            }
+        }
+    }
 } else {
     Push-Location $BackendDir
     try {
         Log "  Working dir: $BackendDir" 'Gray'
         Invoke-NpmCiWithRetry -ProjectDir $BackendDir -Label 'backend'
+
+        # After npm ci, verify that native modules match the runtime Node ABI
+        # before compiling TypeScript (fail fast if mismatch)
+        $runtimeNodeExe = Join-Path $RuntimeCache 'node\node.exe'
+        if (Test-Path $runtimeNodeExe) {
+            $runtimeAbi     = & $runtimeNodeExe -e "process.stdout.write(String(process.versions.modules))" 2>$null
+            $runtimeVersion = & $runtimeNodeExe --version 2>$null
+            $bindingPath    = 'node_modules/better-sqlite3/build/Release/better_sqlite3.node'
+            if (Test-Path $bindingPath) {
+                $checkJs  = "try{require('./$bindingPath');process.stdout.write('ok')}catch(e){process.stdout.write('abi:'+e.message.split('\n')[0])}"
+                $prevEap  = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+                $chkOut   = & $runtimeNodeExe -e $checkJs 2>$null
+                $ErrorActionPreference = $prevEap
+
+                if ($chkOut -eq 'ok') {
+                    Log "  [OK] better-sqlite3 ABI matches runtime $runtimeVersion (ABI $runtimeAbi)" 'Green'
+                } else {
+                    Log "[ERROR] Native module ABI MISMATCH detected!" 'Red'
+                    Log "  Runtime Node : $runtimeVersion  (ABI $runtimeAbi)" 'Yellow'
+                    Log "  better-sqlite3 error: $chkOut" 'Yellow'
+                    Log "" 'Yellow'
+                    Log "  Fix: Rebuild the native module for the runtime Node version:" 'Yellow'
+                    Log "    1. Ensure runtime-cache\node\node.exe is the target version" 'Yellow'
+                    Log "    2. In $BackendDir run:" 'Yellow'
+                    Log "         npm rebuild better-sqlite3" 'Yellow'
+                    Log "    3. Then re-run build-installer.ps1" 'Yellow'
+                    exit 1
+                }
+            } else {
+                Log "  [INFO] better-sqlite3 binding not yet present (will appear after npm ci)" 'Gray'
+            }
+        } else {
+            Log "  [WARN] runtime-cache\node\node.exe not found; skipping ABI check" 'Yellow'
+        }
 
         Log '  Running: npm run build' 'Yellow'
         npm run build
@@ -443,7 +504,8 @@ $iscc = $null
 $isccCandidates = @(
     'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
     'C:\Program Files\Inno Setup 6\ISCC.exe',
-    'C:\Program Files (x86)\Inno Setup 5\ISCC.exe'
+    'C:\Program Files (x86)\Inno Setup 5\ISCC.exe',
+    "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
 )
 foreach ($c in $isccCandidates) { if (Test-Path $c) { $iscc = $c; break } }
 if (-not $iscc) {

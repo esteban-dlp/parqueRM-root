@@ -16,11 +16,6 @@ PRAGMA busy_timeout = 5000;
      sqlite3 /path/to/parquerm.db < 004_add_visitor_health_fields.sql
    ============================================================ */
 
-BEGIN TRANSACTION;
-
-INSERT INTO schema_migrations (migration_name)
-VALUES ('004_add_visitor_health_fields');
-
 ALTER TABLE visitor_records ADD COLUMN has_medication_allergy INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE visitor_records ADD COLUMN medication_allergy_detail TEXT NULL;
 ALTER TABLE visitor_records ADD COLUMN has_diabetes INTEGER NOT NULL DEFAULT 0;
@@ -28,5 +23,3 @@ ALTER TABLE visitor_records ADD COLUMN has_hypertension INTEGER NOT NULL DEFAULT
 ALTER TABLE visitor_records ADD COLUMN has_respiratory_disease INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE visitor_records ADD COLUMN has_animal_bite_allergy INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE visitor_records ADD COLUMN animal_bite_allergy_detail TEXT NULL;
-
-COMMIT;
