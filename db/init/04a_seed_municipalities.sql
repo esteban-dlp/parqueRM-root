@@ -9,6 +9,16 @@ PRAGMA busy_timeout = 5000;
 */
 BEGIN TRANSACTION;
 
+DELETE FROM municipalities
+WHERE department_id = (SELECT id FROM departments WHERE name = 'San Marcos')
+  AND name IN ('San Rafael Pie de la Cuesta', 'San Rafael Pi? de la Cuesta')
+  AND EXISTS (
+    SELECT 1
+    FROM municipalities keep
+    WHERE keep.department_id = municipalities.department_id
+      AND keep.name = 'San Rafael Pié de la Cuesta'
+  );
+
 UPDATE municipalities
 SET name = 'San Rafael Pié de la Cuesta'
 WHERE name = 'San Rafael Pie de la Cuesta'

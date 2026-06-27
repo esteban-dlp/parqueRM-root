@@ -46,14 +46,25 @@ services:
         sqlite3 /data/parquerm.db \"INSERT OR IGNORE INTO schema_migrations (migration_name) VALUES ('005_add_platform_data_reset_permission');\" &&
         echo 'Migracion 005: permiso PLATFORM_DATA_RESET ya presente.';
       fi &&
-      HAS_RECEIPT_LINE_ORIGIN=$$(sqlite3 /data/parquerm.db \"SELECT COUNT(*) FROM pragma_table_info('receipt_lines') WHERE name='origin_type'\") &&
-      if [ \"$$HAS_RECEIPT_LINE_ORIGIN\" = \"0\" ]; then
-        echo 'Aplicando migracion 006 (origen/concepto por linea de ticket)...' &&
-        sqlite3 /data/parquerm.db < /migrations/006_add_receipt_line_origin_fields.sql;
-      else
-        sqlite3 /data/parquerm.db \"INSERT OR IGNORE INTO schema_migrations (migration_name) VALUES ('006_add_receipt_line_origin_fields.sql');\" &&
-        echo 'Migracion 006: columnas de lineas de ticket ya presentes.';
+      HAS_RECEIPT_LINE_CONCEPT=$$(sqlite3 /data/parquerm.db \"SELECT COUNT(*) FROM pragma_table_info('receipt_lines') WHERE name='concept_id'\") &&
+      if [ \"$$HAS_RECEIPT_LINE_CONCEPT\" = \"0\" ]; then
+        echo 'Aplicando migracion 006: agregando concept_id en lineas de ticket...' &&
+        sqlite3 /data/parquerm.db \"ALTER TABLE receipt_lines ADD COLUMN concept_id INTEGER NULL;\";
       fi &&
+      HAS_RECEIPT_LINE_ORIGIN_TYPE=$$(sqlite3 /data/parquerm.db \"SELECT COUNT(*) FROM pragma_table_info('receipt_lines') WHERE name='origin_type'\") &&
+      if [ \"$$HAS_RECEIPT_LINE_ORIGIN_TYPE\" = \"0\" ]; then
+        echo 'Aplicando migracion 006: agregando origin_type en lineas de ticket...' &&
+        sqlite3 /data/parquerm.db \"ALTER TABLE receipt_lines ADD COLUMN origin_type TEXT NULL;\";
+      fi &&
+      HAS_RECEIPT_LINE_ORIGIN_ID=$$(sqlite3 /data/parquerm.db \"SELECT COUNT(*) FROM pragma_table_info('receipt_lines') WHERE name='origin_id'\") &&
+      if [ \"$$HAS_RECEIPT_LINE_ORIGIN_ID\" = \"0\" ]; then
+        echo 'Aplicando migracion 006: agregando origin_id en lineas de ticket...' &&
+        sqlite3 /data/parquerm.db \"ALTER TABLE receipt_lines ADD COLUMN origin_id INTEGER NULL;\";
+      fi &&
+      sqlite3 /data/parquerm.db \"CREATE INDEX IF NOT EXISTS ix_receipt_lines_origin ON receipt_lines(origin_type, origin_id);\" &&
+      sqlite3 /data/parquerm.db \"CREATE INDEX IF NOT EXISTS ix_receipt_lines_concept_id ON receipt_lines(concept_id);\" &&
+      sqlite3 /data/parquerm.db \"INSERT OR IGNORE INTO schema_migrations (migration_name) VALUES ('006_add_receipt_line_origin_fields.sql');\" &&
+      echo 'Migracion 006: columnas e indices de lineas de ticket verificados.' &&
       SYSTEM_LAN_URL_ESCAPED=$$(printf '%s' \"$$SYSTEM_LAN_URL\" | sed \"s/'/''/g\") &&
       sqlite3 /data/parquerm.db \"UPDATE park_config SET system_lan_url = '$$SYSTEM_LAN_URL_ESCAPED', updated_at = CURRENT_TIMESTAMP;\" &&
       echo 'Base SQLite inicializada correctamente.'

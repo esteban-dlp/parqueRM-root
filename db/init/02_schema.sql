@@ -403,8 +403,6 @@ CREATE TABLE IF NOT EXISTS receipt_lines (
     CONSTRAINT fk_receipt_lines_concept FOREIGN KEY (concept_id) REFERENCES financial_concepts(id)
 );
 CREATE INDEX IF NOT EXISTS ix_receipt_lines_receipt_id ON receipt_lines(receipt_id);
-CREATE INDEX IF NOT EXISTS ix_receipt_lines_origin ON receipt_lines(origin_type, origin_id);
-CREATE INDEX IF NOT EXISTS ix_receipt_lines_concept_id ON receipt_lines(concept_id);
 
 /* =========================
    CAJA
